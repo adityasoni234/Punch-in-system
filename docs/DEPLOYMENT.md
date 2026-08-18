@@ -5,11 +5,86 @@ Firebase Hosting gives you HTTPS on a real domain, which is what the app needs:
 fixes the phone problem permanently.
 
 Hosting serves **static files only**. The FastAPI backend and PostgreSQL have
-to live somewhere else. There are two shapes, and the choice matters:
+to live somewhere else.
 
 ---
 
-## Option A — Same origin (recommended)
+## Option C — App on Firebase, API on your laptop (current setup)
+
+```
+   https://your-project.web.app          https://xxxx.trycloudflare.com
+   Firebase Hosting (React PWA)  ──────▶ Cloudflare tunnel
+                                                │
+                                         127.0.0.1:8000  (uvicorn, your laptop)
+                                                │
+                                         PostgreSQL      (your laptop)
+```
+
+**The tunnel is not optional.** An HTTPS page cannot call an `http://` address —
+browsers block it as mixed content — so `http://192.168.110.30:8000` is
+unreachable from a Firebase-hosted app no matter what else is configured.
+
+Trade-offs to be clear about:
+
+- The app only works while your laptop is awake, uvicorn is running and the
+  tunnel is up. Close the lid and everyone is locked out.
+- The free quick-tunnel URL changes on every restart, so the frontend has to be
+  rebuilt and redeployed each time (`VITE_API_BASE_URL` is baked into the
+  bundle at build time). A named Cloudflare tunnel on a domain you own gives a
+  stable URL and removes this.
+- App and API are on different origins, so the refresh cookie drops to
+  `SameSite=None` and CORS is required. Safari's tracking prevention is
+  unfriendly to third-party cookies; if sign-in gets dropped on iOS, this is
+  why, and the fix is a same-origin deployment (Option A) or putting both
+  behind one hostname.
+- While the tunnel runs, your API is on the public internet. It still requires
+  authentication and is rate limited, but it is exposed.
+
+### Steps
+
+```bash
+# 1. Backend settings for split origin
+cp backend/.env.tunnel.example backend/.env      # keep a copy of your dev .env
+python3 -c "import secrets;print(secrets.token_urlsafe(64))"   # -> SECRET_KEY
+# edit CORS_ORIGINS to your real Firebase origins
+
+# 2. Start the API
+cd backend && ./.venv/bin/uvicorn app.main:app --port 8000
+
+# 3. Expose it over HTTPS (new terminal) — prints the URL to use
+./scripts/tunnel-api.sh
+
+# 4. Point the frontend at that URL
+cp frontend/.env.production.example frontend/.env.production
+#    VITE_API_BASE_URL=https://<tunnel-url>/api/v1
+
+# 5. Deploy the PWA
+npx firebase login
+cp .firebaserc.example .firebaserc               # add your project id
+npm run deploy
+```
+
+Then open `https://your-project.web.app` on the phone, sign in, and punch. This
+runs on the **free Spark plan** — no Cloud Run, no billing.
+
+### Simpler alternative if Firebase is not the goal
+
+If the only aim is HTTPS on your phone, one tunnel to the dev server does it
+with no Firebase, no CORS and no cookie relaxation, because everything stays on
+one origin:
+
+```bash
+cd frontend && npm run dev          # Vite proxies /api to :8000
+cloudflared tunnel --url http://localhost:5173
+```
+
+Open the printed URL on the phone. This is strictly more secure than Option C
+and needs no rebuild when the URL changes.
+
+---
+
+## Option A — Same origin, Cloud Run (most robust)
+
 
 ```
                     https://your-app.web.app
@@ -22,8 +97,13 @@ to live somewhere else. There are two shapes, and the choice matters:
 ```
 
 The app and the API share one origin, so the refresh token stays in a
-`SameSite=Lax` cookie and there is no CORS at all. This is the configuration
-`firebase.json` already contains.
+`SameSite=Lax` cookie and there is no CORS at all. Worth moving to when the
+laptop stops being a sensible host. To enable it, put this rewrite back into
+`firebase.json` before the SPA fallback:
+
+```json
+{ "source": "/api/**", "run": { "serviceId": "punchin-api", "region": "asia-south1" } }
+```
 
 **Requires the Blaze (pay-as-you-go) plan** — Hosting rewrites to Cloud Run are
 not available on the free Spark plan. Cloud Run scales to zero, so idle cost is
@@ -31,7 +111,7 @@ near nothing; Cloud SQL's smallest instance is the real line item (a few
 dollars a month). A managed Postgres elsewhere (Neon, Supabase) works just as
 well and has a free tier — Cloud Run reaches it over TCP with `sslmode=require`.
 
-## Option B — Split origin (works on the free Spark plan)
+## Option B — Split origin on a hosted backend (Render / Railway / Fly)
 
 ```
 https://your-app.web.app  ──CORS──▶  https://api.yourhost.com (Render/Railway/Fly)
