@@ -28,8 +28,25 @@ export function isSupported() {
   return typeof navigator !== 'undefined' && 'geolocation' in navigator;
 }
 
+/**
+ * Browsers only expose location on a "secure context": HTTPS, or localhost.
+ *
+ * Opening the app over plain HTTP on a LAN address (http://192.168.x.x) is the
+ * single most common reason location fails on a phone even though Location
+ * Services are switched on system-wide. iOS Safari in particular reports the
+ * permission as grantable and then denies the actual call, which looks
+ * identical to the user having blocked the site.
+ */
+export function isSecureContextOk() {
+  if (typeof window === 'undefined') return true;
+  if (window.isSecureContext) return true;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+}
+
 export async function readPermissionState() {
   if (!isSupported()) return 'unsupported';
+  if (!isSecureContextOk()) return 'insecure';
   if (!navigator.permissions?.query) return 'unknown';
   try {
     const status = await navigator.permissions.query({ name: 'geolocation' });
@@ -41,6 +58,16 @@ export async function readPermissionState() {
 
 export function capturePosition() {
   return new Promise((resolve, reject) => {
+    if (!isSecureContextOk()) {
+      reject(
+        new GeolocationError(
+          ErrorCode.LOCATION_INSECURE_CONTEXT,
+          'This page is not being served over HTTPS, so the browser will not '
+            + 'release your location.',
+        ),
+      );
+      return;
+    }
     if (!isSupported()) {
       reject(
         new GeolocationError(
@@ -116,6 +143,10 @@ export function usePermissionState() {
     (async () => {
       if (!isSupported()) {
         if (!cancelled) setState('unsupported');
+        return;
+      }
+      if (!isSecureContextOk()) {
+        if (!cancelled) setState('insecure');
         return;
       }
       if (!navigator.permissions?.query) {

@@ -6,6 +6,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "frontend"],
       "port": 5173
+    },
+    {
+      "name": "frontend-https",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:https", "--prefix", "frontend"],
+      "port": 5173,
+      "url": "https://localhost:5173"
     }
   ]
 }

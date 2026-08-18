@@ -176,11 +176,58 @@ npm run build      # emits frontend/dist/
 Serve `frontend/dist` and proxy `/api` to uvicorn from the **same origin** — the
 refresh cookie is `SameSite=Lax` and scoped to `/api/v1/auth`.
 
-### Testing on a real phone
+### Testing on a real phone (important)
 
-Geolocation needs a secure context. `http://localhost` counts, a LAN IP does
-not. Use an HTTPS tunnel (`cloudflared tunnel --url http://localhost:5173`,
-`ngrok http 5173`) and open the tunnel URL on the phone.
+**Geolocation only works on a secure context**: HTTPS, or `http://localhost`.
+A phone on the same Wi-Fi reaches this machine on a LAN address such as
+`http://192.168.1.23:5173`, which is **not** a secure context — the browser
+refuses to release a position no matter how the phone's Location Services are
+configured. iOS Safari makes this especially confusing: it reports the
+permission as grantable and then denies the actual call, which looks exactly
+like the user having blocked the site.
+
+Two ways to get HTTPS:
+
+**A. Self-signed certificate (no internet, LAN only)**
+
+```bash
+cd frontend
+npm run cert        # issues a cert for localhost + this machine's LAN IP
+npm run dev:https   # serves https://<LAN-IP>:5173
+```
+
+Safari will warn the certificate is untrusted. Either tap through the warning,
+or install it properly: AirDrop/email `frontend/certs/dev-cert.pem` to the
+phone, then **Settings → General → VPN & Device Management** (install the
+profile) and **Settings → General → About → Certificate Trust Settings**
+(switch it on). Re-run `npm run cert` if your LAN IP changes.
+
+`frontend/certs/` is gitignored — the private key never leaves the machine.
+
+**B. HTTPS tunnel (publicly reachable URL, trusted certificate)**
+
+```bash
+cloudflared tunnel --url http://localhost:5173     # or: ngrok http 5173
+```
+
+Note this exposes your dev server on the public internet for the life of the
+tunnel.
+
+### If location still fails on the phone
+
+The app now tells you which of these it is, but for reference:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| "This page needs HTTPS for location" | Non-secure origin | Use HTTPS as above |
+| "Your browser refused the location request" on iOS | Safari's **per-site** answer is "Don't Allow" — separate from Location Services | `aA` in the address bar → Website Settings → Location → Ask/Allow. Or Settings → Apps → Safari → Location → Ask |
+| Prompt never appears | Site permission already answered | Same as above; iOS remembers a denial |
+| "Location accuracy too low" | Indoor GPS | Enable Precise Location, move near a window, or raise the threshold in Admin → Settings |
+
+The app never decides on your behalf that location is blocked: apart from the
+non-secure-origin case (where the browser can never succeed), tapping **Punch
+in** always calls the real browser API so the phone shows its own permission
+prompt and you answer it.
 
 ---
 
@@ -336,10 +383,15 @@ live timer → punch out with the verification sheet, and the admin screens.
    block legitimate staff. Both the radius and the threshold are admin-tunable
    for exactly this reason.
 3. **HTTPS is mandatory.** `getCurrentPosition` is unavailable on non-localhost
-   HTTP, so phone testing needs a tunnel or a real certificate.
-4. **iOS PWA.** Location needs a user gesture and per-origin permission; the
-   access token is memory-only and is re-derived from the refresh cookie on
-   every cold start, so an install/relaunch is a refresh, not a re-login.
+   HTTP, so phone testing needs `npm run dev:https` or a tunnel — see
+   "Testing on a real phone". The app detects a non-secure origin and says so
+   explicitly instead of blaming the device's location settings.
+4. **iOS PWA.** Location needs a user gesture and per-origin permission. Safari
+   stores a *per-site* location answer independently of Location Services, and
+   once "Don't Allow" is tapped it stops prompting until that site setting is
+   reset — the in-app help walks through it. The access token is memory-only
+   and is re-derived from the refresh cookie on every cold start, so an
+   install/relaunch is a refresh, not a re-login.
 5. **Offline punching is refused by design.** The service worker never caches
    or queues `/api`; a queued punch could not be checked against the geofence
    at the time it was finally delivered.

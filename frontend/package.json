@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "cert": "bash scripts/generate-dev-cert.sh",
+    "dev:https": "HTTPS=true vite",
     "build": "vite build",
     "preview": "vite preview"
   },

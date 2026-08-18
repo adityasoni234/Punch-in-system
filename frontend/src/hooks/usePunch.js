@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { capturePosition, GeolocationError, readPermissionState } from './useGeolocation.js';
+import { capturePosition, GeolocationError, isSecureContextOk } from './useGeolocation.js';
 import { punch as punchApi } from '../services/attendanceService.js';
 import { ApiError } from '../services/apiClient.js';
 import { ErrorCode } from '../utils/errorCodes.js';
@@ -53,18 +53,17 @@ export function usePunch({ online, onSuccess, onStateChanged }) {
         return null;
       }
 
-      const permission = await readPermissionState();
-      if (permission === 'denied') {
+      // An insecure origin is the one case worth short-circuiting: the browser
+      // will never release a position, so prompting would only produce a
+      // confusing "denied". Everything else goes straight to the real API so
+      // the browser -- not this app -- decides, and the user gets the native
+      // permission prompt rather than being told by us that they are blocked.
+      if (!isSecureContextOk()) {
         setFailure({
-          code: ErrorCode.LOCATION_PERMISSION_DENIED,
-          message: 'Location permission is blocked for this site.',
-        });
-        return null;
-      }
-      if (permission === 'unsupported') {
-        setFailure({
-          code: ErrorCode.LOCATION_UNSUPPORTED,
-          message: 'This browser cannot provide a location.',
+          code: ErrorCode.LOCATION_INSECURE_CONTEXT,
+          message:
+            'This page is not being served over HTTPS, so the browser will not release '
+            + 'your location.',
         });
         return null;
       }

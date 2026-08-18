@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Clock, MapPin, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Clock, Crosshair, MapPin, RefreshCw } from 'lucide-react';
 import {
   Button,
   Card,
@@ -16,16 +16,24 @@ import {
   StatusCard,
 } from '../components/attendance/PunchControls.jsx';
 import {
+  InsecureContextHelp,
+  LocationBlockedHelp,
   LocationPermissionPrompt,
   PunchFailure,
 } from '../components/location/LocationStates.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAsync } from '../hooks/useAsync.js';
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js';
-import { usePermissionState } from '../hooks/useGeolocation.js';
+import {
+  capturePosition,
+  GeolocationError,
+  isSecureContextOk,
+  usePermissionState,
+} from '../hooks/useGeolocation.js';
 import { usePunch } from '../hooks/usePunch.js';
 import { getToday } from '../services/attendanceService.js';
 import { formatDuration, formatTime, greeting } from '../utils/time.js';
+import { ErrorCode } from '../utils/errorCodes.js';
 import { metres } from '../utils/format.js';
 
 export default function Dashboard() {
@@ -34,6 +42,33 @@ export default function Dashboard() {
   const { permissionState, refreshPermissionState } = usePermissionState();
   const { data, error, loading, reload } = useAsync(() => getToday(), []);
   const [resultOpen, setResultOpen] = useState(false);
+  const [locationCheck, setLocationCheck] = useState({ status: 'idle' });
+  const secureOrigin = useMemo(() => isSecureContextOk(), []);
+
+  /**
+   * Asks the browser for a position without punching.
+   *
+   * This is the "turn it on yourself" path: the app never decides that the
+   * user is blocked, it just calls the real API so the browser shows its own
+   * permission prompt and the user answers it.
+   */
+  const primeLocation = useCallback(async () => {
+    setLocationCheck({ status: 'checking' });
+    try {
+      const position = await capturePosition();
+      setLocationCheck({ status: 'ok', accuracy: position.accuracy });
+      refreshPermissionState();
+    } catch (caught) {
+      setLocationCheck({
+        status: 'error',
+        failure: {
+          code: caught instanceof GeolocationError ? caught.code : ErrorCode.LOCATION_UNAVAILABLE,
+          message: caught.message,
+        },
+      });
+      refreshPermissionState();
+    }
+  }, [refreshPermissionState]);
 
   const onSuccess = useCallback(() => {
     reload({ quiet: true });
@@ -76,9 +111,41 @@ export default function Dashboard() {
   const lastSession = completed[completed.length - 1] || null;
 
   const handlePunch = async (which) => {
+    setLocationCheck({ status: 'idle' });
     await punch(which);
     refreshPermissionState();
   };
+
+  // One location panel at a time, most specific first, so the screen never
+  // shows "enable location" and "location refused" side by side.
+  const locationPanel = (() => {
+    if (failure) return <PunchFailure failure={failure} onRetry={() => handlePunch(direction)} />;
+    if (!secureOrigin) return <InsecureContextHelp />;
+    if (locationCheck.status === 'error') {
+      return <PunchFailure failure={locationCheck.failure} onRetry={primeLocation} />;
+    }
+    if (locationCheck.status === 'ok') {
+      return (
+        <Notice variant="success" title="Location is on">
+          Your device returned a position accurate to about {Math.round(locationCheck.accuracy)} m.
+          You can punch {direction === 'in' ? 'in' : 'out'} now — the server checks the geofence
+          when you tap.
+        </Notice>
+      );
+    }
+    // Surfaced proactively, but the punch button stays enabled: the browser,
+    // not this app, decides whether a request is refused.
+    if (permissionState === 'denied') return <LocationBlockedHelp onRetry={primeLocation} />;
+    if (permissionState === 'prompt' || permissionState === 'unknown') {
+      return (
+        <LocationPermissionPrompt
+          onEnable={primeLocation}
+          busy={locationCheck.status === 'checking'}
+        />
+      );
+    }
+    return null;
+  })();
 
   return (
     <>
@@ -99,19 +166,27 @@ export default function Dashboard() {
         />
       </Card>
 
-      {permissionState === 'prompt' && (
-        <LocationPermissionPrompt onEnable={() => handlePunch(direction)} busy={busy} />
-      )}
-
-      <PunchFailure failure={failure} onRetry={() => handlePunch(direction)} />
+      {locationPanel}
 
       <PunchButton
         direction={direction}
         onPunch={handlePunch}
         busy={busy}
         phase={phase}
-        disabled={!online}
+        disabled={!online || !secureOrigin}
       />
+
+      {permissionState === 'granted' && locationCheck.status === 'idle' && !failure && (
+        <Button
+          variant="ghost"
+          block
+          icon={Crosshair}
+          onClick={primeLocation}
+          loading={locationCheck.status === 'checking'}
+        >
+          Check my location first
+        </Button>
+      )}
 
       {!online && (
         <Notice variant="warn" title="Offline">

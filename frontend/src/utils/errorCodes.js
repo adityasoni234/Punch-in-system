@@ -31,6 +31,7 @@ export const ErrorCode = {
   LOCATION_UNAVAILABLE: 'LOCATION_UNAVAILABLE',
   LOCATION_TIMEOUT: 'LOCATION_TIMEOUT',
   LOCATION_UNSUPPORTED: 'LOCATION_UNSUPPORTED',
+  LOCATION_INSECURE_CONTEXT: 'LOCATION_INSECURE_CONTEXT',
 };
 
 // Codes that mean "the punch did not happen, and the state on screen is stale".

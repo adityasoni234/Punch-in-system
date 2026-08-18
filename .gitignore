@@ -21,3 +21,6 @@ frontend/dist/
 *.swp
 .idea/
 .vscode/
+
+# Local development certificates — never commit the private key
+frontend/certs/
