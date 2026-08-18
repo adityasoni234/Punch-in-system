@@ -1,0 +1,23 @@
+# Local PostgreSQL for development. The application itself is run with
+# `uvicorn` and `vite` (see README); only the database is containerised so the
+# stack stays a plain modular monolith.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: punchin-db
+    environment:
+      POSTGRES_USER: punchin
+      POSTGRES_PASSWORD: punchin
+      POSTGRES_DB: punchin
+    ports:
+      - '5432:5432'
+    volumes:
+      - punchin_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U punchin']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  punchin_pgdata:

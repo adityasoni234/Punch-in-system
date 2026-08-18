@@ -1,0 +1,23 @@
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets — never commit
+.env
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# Node
+node_modules/
+frontend/dist/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+import enum
+
+
+class StrEnum(str, enum.Enum):
+    def __str__(self) -> str:  # pragma: no cover - convenience
+        return self.value
+
+
+class Role(StrEnum):
+    USER = "USER"
+    ADMIN = "ADMIN"
+
+
+class UserStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    DISABLED = "DISABLED"
+
+
+class DayStatus(StrEnum):
+    ABSENT = "ABSENT"
+    PRESENT = "PRESENT"
+    CHECKED_OUT = "CHECKED_OUT"
+
+
+class SessionStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
+    AUTO_CLOSED = "AUTO_CLOSED"
+    MANUAL = "MANUAL"
+
+
+class PunchType(StrEnum):
+    IN = "IN"
+    OUT = "OUT"
+
+
+class ValidationStatus(StrEnum):
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
+
+class AuditAction(StrEnum):
+    LOGIN_SUCCESS = "LOGIN_SUCCESS"
+    LOGIN_FAILED = "LOGIN_FAILED"
+    LOGOUT = "LOGOUT"
+    TOKEN_REFRESH_REUSE = "TOKEN_REFRESH_REUSE"
+    PASSWORD_CHANGED = "PASSWORD_CHANGED"
+
+    PUNCH_IN_SUCCESS = "PUNCH_IN_SUCCESS"
+    PUNCH_IN_REJECTED = "PUNCH_IN_REJECTED"
+    PUNCH_OUT_SUCCESS = "PUNCH_OUT_SUCCESS"
+    PUNCH_OUT_REJECTED = "PUNCH_OUT_REJECTED"
+    LOCATION_PERMISSION_FAILURE = "LOCATION_PERMISSION_FAILURE"
+    SUSPICIOUS_MOVEMENT = "SUSPICIOUS_MOVEMENT"
+    SESSION_AUTO_CLOSED = "SESSION_AUTO_CLOSED"
+
+    USER_CREATED = "USER_CREATED"
+    USER_UPDATED = "USER_UPDATED"
+    USER_DISABLED = "USER_DISABLED"
+    USER_ENABLED = "USER_ENABLED"
+    USER_ROLE_CHANGED = "USER_ROLE_CHANGED"
+    USER_PASSWORD_RESET = "USER_PASSWORD_RESET"
+
+    WORKSPACE_UPDATED = "WORKSPACE_UPDATED"
+    ADMIN_ATTENDANCE_EDIT = "ADMIN_ATTENDANCE_EDIT"
+    REPORT_EXPORTED = "REPORT_EXPORTED"
+    RATE_LIMIT_TRIGGERED = "RATE_LIMIT_TRIGGERED"
+
+
+class AuditResult(StrEnum):
+    SUCCESS = "SUCCESS"
+    FAILURE = "FAILURE"
