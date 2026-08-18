@@ -24,3 +24,8 @@ frontend/dist/
 
 # Local development certificates — never commit the private key
 frontend/certs/
+
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log

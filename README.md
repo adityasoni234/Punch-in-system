@@ -231,6 +231,21 @@ prompt and you answer it.
 
 ---
 
+### Deploying to HTTPS
+
+For a permanent HTTPS URL (which removes the phone location problem entirely),
+see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — Firebase Hosting for the PWA
+with `/api/**` rewritten to Cloud Run, so the app and API stay on one origin.
+The Firebase CLI is installed as a project dev dependency; use `npx firebase`.
+
+```bash
+npx firebase login
+cp .firebaserc.example .firebaserc   # add your project id
+npm run deploy                       # build + deploy hosting
+```
+
+---
+
 ## 7. Creating the first admin
 
 ```bash

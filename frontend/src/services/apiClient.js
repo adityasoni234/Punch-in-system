@@ -11,7 +11,18 @@
 import { ErrorCode } from '../utils/errorCodes.js';
 import { syncServerClock } from '../utils/time.js';
 
-const BASE_URL = '/api/v1';
+/**
+ * Same-origin by default.
+ *
+ * Keeping the API on the same origin as the app is a security decision, not a
+ * convenience one: it lets the refresh token stay in a `SameSite=Lax` cookie.
+ * Set VITE_API_BASE_URL only if the API genuinely lives on another origin, in
+ * which case the cookie has to be relaxed to `SameSite=None` server-side and
+ * the origin must be listed in CORS_ORIGINS.
+ */
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const CROSS_ORIGIN = /^https?:\/\//i.test(BASE_URL);
+const CREDENTIALS = CROSS_ORIGIN ? 'include' : 'same-origin';
 
 let accessToken = null;
 let onSessionLost = null;
@@ -68,7 +79,7 @@ async function refreshSession() {
     refreshPromise = (async () => {
       const response = await fetch(`${BASE_URL}/auth/refresh`, {
         method: 'POST',
-        credentials: 'same-origin',
+        credentials: CREDENTIALS,
         headers: { Accept: 'application/json' },
       });
       const body = await parseBody(response);
@@ -101,7 +112,7 @@ export async function request(
       method,
       headers: requestHeaders,
       body: body === undefined ? undefined : JSON.stringify(body),
-      credentials: 'same-origin',
+      credentials: CREDENTIALS,
       cache: 'no-store',
       signal,
     });

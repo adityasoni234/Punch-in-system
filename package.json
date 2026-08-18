@@ -1,0 +1,15 @@
+{
+  "name": "punch-in-system",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Geofenced workspace attendance PWA — deployment tooling",
+  "scripts": {
+    "build": "npm --prefix frontend run build",
+    "deploy": "npm run build && firebase deploy --only hosting",
+    "deploy:preview": "npm run build && firebase hosting:channel:deploy preview",
+    "firebase": "firebase"
+  },
+  "devDependencies": {
+    "firebase-tools": "^13.35.1"
+  }
+}
