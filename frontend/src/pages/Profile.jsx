@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, MapPin, ShieldCheck, TrendingUp } from 'lucide-react';
+import { KeyRound, LogOut, MapPin, ShieldCheck, TrendingUp } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -114,6 +114,15 @@ export default function Profile() {
           Open admin
         </Button>
       )}
+
+      <Button
+        variant="outline"
+        block
+        icon={KeyRound}
+        onClick={() => navigate('/change-password')}
+      >
+        Change password
+      </Button>
 
       <Button variant="outline" block icon={LogOut} onClick={handleSignOut}>
         Sign out
