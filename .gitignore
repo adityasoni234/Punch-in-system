@@ -27,7 +27,6 @@ frontend/certs/
 
 # Firebase
 .firebase/
-.firebaserc
 firebase-debug.log
 
 # Build-time frontend config (may reference a private tunnel URL)

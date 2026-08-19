@@ -40,32 +40,51 @@ Trade-offs to be clear about:
 - While the tunnel runs, your API is on the public internet. It still requires
   authentication and is rate limited, but it is exposed.
 
-### Steps
+### Steps for this project (`punchin-7c498`)
+
+**One-time setup**
 
 ```bash
-# 1. Backend settings for split origin
-cp backend/.env.tunnel.example backend/.env      # keep a copy of your dev .env
+# The Firebase CLI is already a dev dependency of this repo -- no global
+# install, no sudo. .firebaserc already points at punchin-7c498.
+npx firebase login          # opens a browser; only you can do this
+
+# Backend settings for the split-origin deployment.
+cp backend/.env backend/.env.development.bak      # keep your dev settings
+cp backend/.env.firebase.example backend/.env
 python3 -c "import secrets;print(secrets.token_urlsafe(64))"   # -> SECRET_KEY
-# edit CORS_ORIGINS to your real Firebase origins
-
-# 2. Start the API
-cd backend && ./.venv/bin/uvicorn app.main:app --port 8000
-
-# 3. Expose it over HTTPS (new terminal) — prints the URL to use
-./scripts/tunnel-api.sh
-
-# 4. Point the frontend at that URL
-cp frontend/.env.production.example frontend/.env.production
-#    VITE_API_BASE_URL=https://<tunnel-url>/api/v1
-
-# 5. Deploy the PWA
-npx firebase login
-cp .firebaserc.example .firebaserc               # add your project id
-npm run deploy
+# paste it into backend/.env. Keep it stable: changing it signs everyone out.
 ```
 
-Then open `https://your-project.web.app` on the phone, sign in, and punch. This
-runs on the **free Spark plan** — no Cloud Run, no billing.
+**Every time you want the app online**
+
+```bash
+# Terminal 1 -- the API
+cd backend && ./.venv/bin/uvicorn app.main:app --port 8000
+
+# Terminal 2 -- expose it over HTTPS, prints https://xxxx.trycloudflare.com
+npm run tunnel
+
+# Terminal 3 -- build against that URL and deploy
+npm run deploy:api https://xxxx.trycloudflare.com
+```
+
+Then open **https://punchin-7c498.web.app** on the phone, sign in, and punch.
+This runs on the **free Spark plan** — no Cloud Run, no billing.
+
+### About the Firebase JS SDK snippet
+
+The console shows an `initializeApp({ apiKey: ... })` snippet after you create
+a web app. **Hosting does not use it**, and this project does not include it.
+The SDK is only needed for Firebase *products* — Authentication, Firestore,
+Storage, Analytics — and this app uses none of them: it has its own JWT auth
+and PostgreSQL. Adding it would pull in a dependency for nothing, and
+`getAnalytics` in particular would ship Google Analytics into an attendance
+app that otherwise collects no behavioural data.
+
+The `apiKey` in that snippet is not a secret — it identifies the project, it
+does not authorise anything — so there is no harm in it having been shared,
+but there is also no reason to add it.
 
 ### Simpler alternative if Firebase is not the goal
 
