@@ -9,7 +9,9 @@
     "deploy:api": "bash scripts/deploy-firebase.sh",
     "tunnel": "bash scripts/tunnel-api.sh",
     "deploy:preview": "npm run build && firebase hosting:channel:deploy preview",
-    "firebase": "firebase"
+    "firebase": "firebase",
+    "login": "firebase login",
+    "whoami": "firebase login:list"
   },
   "devDependencies": {
     "firebase-tools": "^13.35.1"

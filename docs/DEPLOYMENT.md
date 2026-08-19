@@ -45,9 +45,12 @@ Trade-offs to be clear about:
 **One-time setup**
 
 ```bash
-# The Firebase CLI is already a dev dependency of this repo -- no global
-# install, no sudo. .firebaserc already points at punchin-7c498.
-npx firebase login          # opens a browser; only you can do this
+# The Firebase CLI is a dev dependency of THIS REPO -- no global install, no
+# sudo. That means there is no `firebase` command on your PATH; run it with
+# `npx firebase ...` or via the npm scripts. .firebaserc already points at
+# punchin-7c498.
+npm run login               # = npx firebase login; opens a browser
+npm run whoami              # confirms which account is authorised
 
 # Backend settings for the split-origin deployment.
 cp backend/.env backend/.env.development.bak      # keep your dev settings
@@ -71,6 +74,18 @@ npm run deploy:api https://xxxx.trycloudflare.com
 
 Then open **https://punchin-7c498.web.app** on the phone, sign in, and punch.
 This runs on the **free Spark plan** — no Cloud Run, no billing.
+
+### Commands that look right but are not
+
+| Typed | What happens | Use instead |
+|---|---|---|
+| `firebase login` | `command not found` — the CLI is local to this repo, not global | `npm run login` or `npx firebase login` |
+| `npm firebase login` | npm has no `firebase` subcommand | `npm run firebase -- login` |
+| `npm install firebase` | installs the **JS SDK**, a different package that this app does not use | nothing to install; the CLI is already here |
+
+Node 24 prints an `EBADENGINE` warning about `superstatic` when installing
+firebase-tools. It is harmless for `deploy` — superstatic only backs the local
+emulator (`firebase serve`). If you ever use the emulator, run it on Node 20.
 
 ### About the Firebase JS SDK snippet
 
