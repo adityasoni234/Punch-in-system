@@ -33,7 +33,7 @@ export default function Login() {
             : caught.message,
         );
       } else {
-        setError('Could not sign in. Please try again.');
+        setError(caught?.message || 'Could not sign in. Please try again.');
       }
     } finally {
       setBusy(false);

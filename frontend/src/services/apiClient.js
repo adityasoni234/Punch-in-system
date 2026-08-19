@@ -148,6 +148,20 @@ export async function request(
   }
 
   const payload = await parseBody(response);
+
+  // A 2xx that is not JSON means we are not talking to the API at all -- the
+  // usual cause is a build with no VITE_API_BASE_URL deployed to static
+  // hosting, where the SPA fallback answers /api/v1/* with index.html. Failing
+  // loudly here turns a baffling "could not sign in" into an actionable error.
+  if (response.ok && payload === null) {
+    throw new ApiError(
+      ErrorCode.API_UNREACHABLE,
+      `No API responded at ${BASE_URL}. The app is built against the wrong `
+        + 'address, or the backend is not running.',
+      { status: response.status, details: { base_url: BASE_URL } },
+    );
+  }
+
   if (!response.ok) {
     const error = toError(response, payload);
     if (error.status === 403 && error.code === ErrorCode.USER_DISABLED) {
