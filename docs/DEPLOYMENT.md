@@ -53,10 +53,20 @@ npm run login               # = npx firebase login; opens a browser
 npm run whoami              # confirms which account is authorised
 
 # Backend settings for the split-origin deployment.
-cp backend/.env backend/.env.development.bak      # keep your dev settings
-cp backend/.env.firebase.example backend/.env
-python3 -c "import secrets;print(secrets.token_urlsafe(64))"   # -> SECRET_KEY
-# paste it into backend/.env. Keep it stable: changing it signs everyone out.
+./scripts/use-env.sh firebase
+```
+
+Do **not** copy the `.env.*.example` files by hand. They ship with an empty
+`SECRET_KEY`, so a stray `cp` wipes the real one and the app refuses to start
+with *"Refusing to start with an insecure configuration"*. `use-env.sh` keeps
+the key in `backend/.secret_key` and stamps it into whichever profile you
+select, so it survives every switch — which matters, because changing the key
+signs every user out.
+
+Switch back for local work with:
+
+```bash
+./scripts/use-env.sh dev
 ```
 
 **Every time you want the app online**

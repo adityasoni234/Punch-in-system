@@ -31,3 +31,8 @@ firebase-debug.log
 
 # Build-time frontend config (may reference a private tunnel URL)
 frontend/.env.production
+
+# Backend signing key — generated locally, never committed
+backend/.secret_key
+backend/.env.previous
+backend/.env.development.bak
