@@ -12,9 +12,18 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 API_URL="${1:-}"
+
+# With no argument, use the URL the running tunnel recorded. This is the normal
+# path: no copying, so no placeholder pasted by mistake.
+if [ -z "${API_URL}" ] && [ -s .tunnel-url ]; then
+  API_URL="$(tr -d '\n' < .tunnel-url)"
+  echo "Using the tunnel URL from .tunnel-url: ${API_URL}"
+fi
+
 if [ -z "${API_URL}" ]; then
-  echo "usage: $0 https://<your-api-host>" >&2
-  echo "       (the Cloudflare tunnel URL printed by ./scripts/tunnel-api.sh)" >&2
+  echo "No API URL given and .tunnel-url is empty." >&2
+  echo "Start the tunnel first:  npm run tunnel" >&2
+  echo "or pass one explicitly:  $0 https://your-api-host" >&2
   exit 1
 fi
 

@@ -36,3 +36,6 @@ frontend/.env.production
 backend/.secret_key
 backend/.env.previous
 backend/.env.development.bak
+
+# Recorded by scripts/tunnel-api.sh
+.tunnel-url

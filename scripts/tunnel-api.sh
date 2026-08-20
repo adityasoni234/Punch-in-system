@@ -32,25 +32,37 @@ if ! curl -sf "http://127.0.0.1:${PORT}/api/v1/health" >/dev/null; then
   exit 1
 fi
 
-cat <<'MSG'
-Opening a public HTTPS tunnel to your local API.
+URL_FILE=".tunnel-url"
+rm -f "${URL_FILE}"
 
-When the URL appears (https://something.trycloudflare.com):
+echo "Opening a public HTTPS tunnel to http://127.0.0.1:${PORT} ..."
+echo "Ctrl-C closes it and takes the API offline."
+echo
 
-  1. backend/.env      CORS_ORIGINS=https://YOUR_PROJECT.web.app
-                       COOKIE_SECURE=true
-                       COOKIE_SAMESITE=none
-                       TRUST_PROXY_HEADERS=true
-                       ...then restart uvicorn
+# cloudflared prints the URL in a banner. Watch for it, record it, and print
+# the exact command to run next -- copying a placeholder out of documentation
+# is how this goes wrong.
+cloudflared tunnel --url "http://127.0.0.1:${PORT}" 2>&1 | while IFS= read -r line; do
+  printf '%s\n' "${line}"
+  case "${line}" in
+    *trycloudflare.com*)
+      url="$(printf '%s' "${line}" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | head -1)"
+      if [ -n "${url}" ] && [ ! -f "${URL_FILE}" ]; then
+        printf '%s' "${url}" > "${URL_FILE}"
+        cat <<BANNER
 
-  2. frontend/.env.production
-                       VITE_API_BASE_URL=https://<that-url>/api/v1
+  ============================================================
+   Tunnel is live:  ${url}
 
-  3. npm run deploy    (rebuilds and redeploys the Firebase frontend)
+   Now run this in another terminal, exactly as written:
 
-The URL changes every time this script restarts, so step 2 and 3 have to be
-repeated each time. Ctrl-C closes the tunnel and takes the API offline.
+       npm run deploy:api
 
-MSG
+   (it reads the URL above from .tunnel-url -- nothing to paste)
+  ============================================================
 
-exec cloudflared tunnel --url "http://127.0.0.1:${PORT}"
+BANNER
+      fi
+      ;;
+  esac
+done

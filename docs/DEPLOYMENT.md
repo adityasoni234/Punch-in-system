@@ -78,9 +78,14 @@ cd backend && ./.venv/bin/uvicorn app.main:app --port 8000
 # Terminal 2 -- expose it over HTTPS, prints https://xxxx.trycloudflare.com
 npm run tunnel
 
-# Terminal 3 -- build against that URL and deploy
-npm run deploy:api https://xxxx.trycloudflare.com
+# Terminal 3 -- build against that URL and deploy.
+# No argument needed: the tunnel records its URL in .tunnel-url and this
+# reads it. Pass a URL explicitly only for a non-tunnel API.
+npm run deploy:api
 ```
+
+Order matters. `npm run tunnel` refuses to start if nothing is listening on
+:8000, so start the API first.
 
 Then open **https://punchin-7c498.web.app** on the phone, sign in, and punch.
 This runs on the **free Spark plan** — no Cloud Run, no billing.
