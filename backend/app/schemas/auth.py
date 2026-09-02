@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
-from app.models.enums import Role, UserStatus
+from app.models.enums import Role, Team, UserStatus
 from app.schemas.common import ORMModel
 
 
@@ -46,6 +46,7 @@ class UserPublic(ORMModel):
     email: str
     member_id: str
     role: Role
+    team: Team
     status: UserStatus
     must_change_password: bool
     created_at: datetime

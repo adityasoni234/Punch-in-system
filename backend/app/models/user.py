@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import CITEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, uuid_pk
-from app.models.enums import Role, UserStatus
+from app.models.enums import Role, Team, UserStatus
 
 
 def _enum(py_enum: type, name: str) -> Enum:
@@ -35,6 +35,10 @@ class User(Base, TimestampMixin):
     status: Mapped[UserStatus] = mapped_column(
         _enum(UserStatus, "user_status_enum"), nullable=False, default=UserStatus.ACTIVE
     )
+    team: Mapped[Team] = mapped_column(
+        _enum(Team, "team_enum"), nullable=False, default=Team.MEMBER,
+        server_default=Team.MEMBER.value,
+    )
     must_change_password: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True
     )
@@ -47,7 +51,10 @@ class User(Base, TimestampMixin):
 
     attendance_days = relationship("AttendanceDay", back_populates="user")
 
-    __table_args__ = (Index("ix_users_status_role", "status", "role"),)
+    __table_args__ = (
+        Index("ix_users_status_role", "status", "role"),
+        Index("ix_users_team", "team"),
+    )
 
     @property
     def is_admin(self) -> bool:

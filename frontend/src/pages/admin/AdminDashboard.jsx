@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Card,
+  CardTitle,
   EmptyState,
   ErrorState,
   SegmentedControl,
@@ -16,13 +17,57 @@ import { useLiveTimer } from '../../hooks/useLiveTimer.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { getDashboard } from '../../services/adminService.js';
 import { formatDuration, formatTime } from '../../utils/time.js';
-import { initials } from '../../utils/format.js';
+import { initials, teamLabel, teamShort } from '../../utils/format.js';
 
 const TABS = [
   { value: 'present', label: 'Present' },
   { value: 'absent', label: 'Absent' },
   { value: 'checked_out', label: 'Out' },
 ];
+
+/**
+ * One line of the branch breakdown.
+ *
+ * The bar is present-over-total, so an executive turnout of 2/3 reads
+ * differently from a member turnout of 2/40 at a glance.
+ */
+function TeamRow({ row }) {
+  const share = row.total > 0 ? Math.round((row.present / row.total) * 100) : 0;
+  return (
+    <div>
+      <div className="row row--between" style={{ marginBottom: 4 }}>
+        <span style={{ fontWeight: 620, fontSize: 14 }}>{teamLabel(row.team)}</span>
+        <span className="mono" style={{ fontSize: 13, fontWeight: 640 }}>
+          <span style={{ color: 'var(--green-600)' }}>{row.present}</span>
+          <span style={{ color: 'var(--text-muted)' }}> / {row.total} present</span>
+        </span>
+      </div>
+      <div
+        style={{
+          height: 6,
+          borderRadius: 999,
+          background: 'var(--slate-100)',
+          overflow: 'hidden',
+        }}
+        role="img"
+        aria-label={`${row.present} of ${row.total} ${teamLabel(row.team)} present`}
+      >
+        <div
+          style={{
+            width: `${share}%`,
+            height: '100%',
+            borderRadius: 999,
+            background: 'var(--green-600)',
+            transition: 'width 0.3s ease',
+          }}
+        />
+      </div>
+      <div className="tiny" style={{ marginTop: 3 }}>
+        {row.absent} absent · {row.checked_out} checked out
+      </div>
+    </div>
+  );
+}
 
 function PresentRow({ entry, timezone }) {
   // Ticks locally from the server-issued punch-in time; no polling required.
@@ -33,7 +78,8 @@ function PresentRow({ entry, timezone }) {
       <div className="list-row__main">
         <div className="list-row__name">{entry.name}</div>
         <div className="list-row__meta">
-          IN {formatTime(entry.punch_in, timezone)} · {entry.member_id}
+          {teamShort(entry.team)} · IN {formatTime(entry.punch_in, timezone)} ·{' '}
+          {entry.member_id}
           {entry.is_late ? ' · late' : ''}
         </div>
       </div>
@@ -58,6 +104,7 @@ function SimpleRow({ entry, variant, timezone }) {
       <div className="list-row__main">
         <div className="list-row__name">{entry.name}</div>
         <div className="list-row__meta">
+          {teamShort(entry.team)} ·{' '}
           {variant === 'checked-out'
             ? `${formatTime(entry.punch_in, timezone)} → ${formatTime(
                 entry.last_punch_out,
@@ -126,6 +173,15 @@ export default function AdminDashboard() {
         <StatTile label="Absent" value={data.absent_count} tone="absent" />
         <StatTile label="Checked out" value={data.checked_out_count} tone="checked" />
       </div>
+
+      <Card>
+        <CardTitle>By team</CardTitle>
+        <div className="stack stack--tight">
+          {data.breakdown.map((row) => (
+            <TeamRow key={row.team} row={row} />
+          ))}
+        </div>
+      </Card>
 
       <SegmentedControl
         options={TABS.map((t) => ({

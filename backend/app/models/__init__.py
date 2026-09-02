@@ -9,6 +9,7 @@ from app.models.enums import (
     PunchType,
     Role,
     SessionStatus,
+    Team,
     UserStatus,
     ValidationStatus,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "RefreshToken",
     "Role",
     "SessionStatus",
+    "Team",
     "User",
     "UserStatus",
     "ValidationStatus",

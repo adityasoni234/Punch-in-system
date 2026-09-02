@@ -33,7 +33,7 @@ from app.core.time import utcnow  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models.enums import Role, UserStatus  # noqa: E402
+from app.models.enums import Role, Team, UserStatus  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.models.workspace import Workspace  # noqa: E402
 
@@ -107,6 +107,7 @@ def make_user(
     password: str = "CorrectHorse99",
     role: Role = Role.USER,
     status: UserStatus = UserStatus.ACTIVE,
+    team: Team = Team.MEMBER,
     name: str = "Test User",
 ) -> User:
     suffix = uuid.uuid4().hex[:8]
@@ -116,6 +117,7 @@ def make_user(
         member_id=f"EMP{suffix.upper()}",
         password_hash=hash_password(password),
         role=role,
+        team=team,
         status=status,
         must_change_password=False,
         password_changed_at=utcnow(),

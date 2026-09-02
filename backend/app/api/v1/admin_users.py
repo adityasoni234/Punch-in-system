@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Query, status
 
 from app.core.deps import AdminUser, DbSession
-from app.models.enums import Role, UserStatus
+from app.models.enums import Role, Team, UserStatus
 from app.schemas.admin import (
     UserCreateRequest,
     UserCreatedResponse,
@@ -25,6 +25,7 @@ def list_users(
     db: DbSession,
     search: str | None = None,
     role: Role | None = None,
+    team: Team | None = None,
     user_status: UserStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
@@ -35,6 +36,7 @@ def list_users(
         db,
         search=search,
         role=role,
+        team=team,
         status=user_status,
         page=page,
         page_size=page_size,

@@ -30,7 +30,7 @@ import {
   updateUser,
 } from '../../services/adminService.js';
 import { formatDateLong, formatDuration, formatTime } from '../../utils/time.js';
-import { initials, metres } from '../../utils/format.js';
+import { initials, metres, TEAMS, teamLabel } from '../../utils/format.js';
 
 const PERIODS = [
   { value: 'week', label: 'Week' },
@@ -114,13 +114,15 @@ export default function AdminUserDetail() {
           </div>
           <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}>
             <Badge variant={person.role === 'ADMIN' ? 'info' : 'default'}>{person.role}</Badge>
+            <Badge>{teamLabel(person.team)}</Badge>
             <Badge variant={person.status === 'ACTIVE' ? 'present' : 'absent'}>
               {person.status}
             </Badge>
           </div>
         </div>
         <div style={{ marginTop: 'var(--sp-3)' }}>
-          <KeyValue label="Member ID">{person.member_id}</KeyValue>
+          <KeyValue label="Enrollment number">{person.member_id}</KeyValue>
+          <KeyValue label="Team">{teamLabel(person.team)}</KeyValue>
           <KeyValue label="Last sign in">
             {person.last_login_at ? formatTime(person.last_login_at, timezone) : 'Never'}
           </KeyValue>
@@ -138,6 +140,7 @@ export default function AdminUserDetail() {
                 email: person.email,
                 member_id: person.member_id,
                 role: person.role,
+                team: person.team,
               });
               setEditing(true);
             }}
@@ -236,6 +239,18 @@ export default function AdminUserDetail() {
                 value={form.member_id}
                 onChange={(event) => setForm({ ...form, member_id: event.target.value })}
               />
+            </Field>
+            <Field label="Team">
+              <Select
+                value={form.team}
+                onChange={(event) => setForm({ ...form, team: event.target.value })}
+              >
+                {TEAMS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field label="Role">
               <Select

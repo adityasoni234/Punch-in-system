@@ -11,6 +11,7 @@ from app.models.enums import (
     DayStatus,
     PunchType,
     Role,
+    Team,
     UserStatus,
     ValidationStatus,
 )
@@ -23,6 +24,7 @@ class UserCreateRequest(BaseModel):
     email: EmailStr
     member_id: str = Field(min_length=1, max_length=40)
     role: Role = Role.USER
+    team: Team = Team.MEMBER
     password: str | None = Field(
         default=None,
         min_length=10,
@@ -36,6 +38,7 @@ class UserUpdateRequest(BaseModel):
     email: EmailStr | None = None
     member_id: str | None = Field(default=None, min_length=1, max_length=40)
     role: Role | None = None
+    team: Team | None = None
 
 
 class UserStatusRequest(BaseModel):
@@ -54,6 +57,7 @@ class PresenceEntry(BaseModel):
     name: str
     member_id: str
     email: str
+    team: Team = Team.MEMBER
     state: DayStatus
     punch_in: datetime | None = None
     last_punch_out: datetime | None = None
@@ -61,6 +65,16 @@ class PresenceEntry(BaseModel):
     total_seconds: int = 0
     session_count: int = 0
     is_late: bool = False
+
+
+class TeamBreakdown(BaseModel):
+    """Attendance for one slice of the branch, e.g. the executives."""
+
+    team: Team
+    total: int
+    present: int
+    absent: int
+    checked_out: int
 
 
 class AdminDashboardResponse(BaseModel):
@@ -71,6 +85,7 @@ class AdminDashboardResponse(BaseModel):
     present_count: int
     absent_count: int
     checked_out_count: int
+    breakdown: list[TeamBreakdown]
     present: list[PresenceEntry]
     absent: list[PresenceEntry]
     checked_out: list[PresenceEntry]

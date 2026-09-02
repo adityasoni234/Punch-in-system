@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.time import local_date, month_range, to_zone, utcnow, week_range
-from app.models.enums import DayStatus
+from app.models.enums import DayStatus, Team
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories import attendance_repo
@@ -159,6 +159,7 @@ def presence_snapshot(
             "name": user.name,
             "member_id": user.member_id,
             "email": user.email,
+            "team": user.team,
             "is_late": bool(day.is_late) if day else False,
             "session_count": len(day.sessions) if day else 0,
         }
@@ -194,11 +195,25 @@ def presence_snapshot(
     checked_out.sort(key=lambda e: e["name"])
     absent.sort(key=lambda e: e["name"])
 
+    # Bifurcation by team, in organisational order rather than alphabetical.
+    breakdown = []
+    for team in (Team.EXECUTIVE, Team.CORE, Team.MEMBER):
+        breakdown.append(
+            {
+                "team": team,
+                "total": sum(1 for u in users if u.team == team),
+                "present": sum(1 for e in present if e["team"] == team),
+                "absent": sum(1 for e in absent if e["team"] == team),
+                "checked_out": sum(1 for e in checked_out if e["team"] == team),
+            }
+        )
+
     return {
         "date": today,
         "timezone": tz,
         "server_time": now,
         "total_users": len(users),
+        "breakdown": breakdown,
         "present_count": len(present),
         "absent_count": len(absent),
         "checked_out_count": len(checked_out),

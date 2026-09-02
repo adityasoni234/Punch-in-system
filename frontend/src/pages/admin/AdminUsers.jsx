@@ -10,6 +10,7 @@ import {
   Field,
   Input,
   Notice,
+  SegmentedControl,
   Select,
   Sheet,
   SkeletonCard,
@@ -17,20 +18,24 @@ import {
 import { useAsync } from '../../hooks/useAsync.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { createUser, listUsers } from '../../services/adminService.js';
-import { initials } from '../../utils/format.js';
+import { initials, TEAMS, teamShort } from '../../utils/format.js';
 
-const EMPTY_FORM = { name: '', email: '', member_id: '', role: 'USER' };
+const EMPTY_FORM = { name: '', email: '', member_id: '', role: 'USER', team: 'MEMBER' };
 
 export default function AdminUsers() {
   const toast = useToast();
   const [search, setSearch] = useState('');
+  const [team, setTeam] = useState('');
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState(null);
 
-  const { data, error, loading, reload } = useAsync(() => listUsers({ search }), [search]);
+  const { data, error, loading, reload } = useAsync(
+    () => listUsers({ search, team: team || undefined }),
+    [search, team],
+  );
 
   const submit = async (event) => {
     event.preventDefault();
@@ -42,6 +47,7 @@ export default function AdminUsers() {
         email: form.email.trim(),
         member_id: form.member_id.trim(),
         role: form.role,
+        team: form.team,
       });
       setCreated(result);
       setCreating(false);
@@ -75,10 +81,17 @@ export default function AdminUsers() {
       </div>
 
       <Input
-        placeholder="Search by name, email or member ID"
+        placeholder="Search by name, email or enrollment number"
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         aria-label="Search users"
+      />
+
+      <SegmentedControl
+        options={[{ value: '', label: 'All' }, ...TEAMS.map((t) => ({ value: t.value, label: t.short }))]}
+        value={team}
+        onChange={setTeam}
+        ariaLabel="Filter by team"
       />
 
       {loading && !data && <SkeletonCard lines={4} />}
@@ -104,7 +117,7 @@ export default function AdminUsers() {
                 <div className="list-row__main">
                   <div className="list-row__name">{user.name}</div>
                   <div className="list-row__meta">
-                    {user.member_id} · {user.email}
+                    {teamShort(user.team)} · {user.member_id}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}>
@@ -146,7 +159,28 @@ export default function AdminUsers() {
               onChange={(event) => setForm({ ...form, member_id: event.target.value })}
             />
           </Field>
-          <Field label="Role" htmlFor="role">
+          <Field
+            label="Team"
+            htmlFor="team"
+            hint="Where they sit in the branch. Drives the dashboard breakdown."
+          >
+            <Select
+              id="team"
+              value={form.team}
+              onChange={(event) => setForm({ ...form, team: event.target.value })}
+            >
+              {TEAMS.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Role"
+            htmlFor="role"
+            hint="Admins oversee attendance and cannot punch in."
+          >
             <Select
               id="role"
               value={form.role}

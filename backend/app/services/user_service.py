@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import ConflictError, ForbiddenError, NotFoundError
 from app.core.security import generate_password, hash_password
 from app.core.time import utcnow
-from app.models.enums import AuditAction, Role, UserStatus
+from app.models.enums import AuditAction, Role, Team, UserStatus
 from app.models.user import User
 from app.repositories import token_repo, user_repo
 from app.schemas.admin import UserCreateRequest, UserUpdateRequest
@@ -44,6 +44,7 @@ def create(db: Session, *, actor: User, payload: UserCreateRequest) -> tuple[Use
         email=str(payload.email).lower(),
         member_id=payload.member_id.strip(),
         role=payload.role,
+        team=payload.team,
         status=UserStatus.ACTIVE,
         password_hash=hash_password(temporary_password),
         must_change_password=True,
@@ -55,7 +56,11 @@ def create(db: Session, *, actor: User, payload: UserCreateRequest) -> tuple[Use
         AuditAction.USER_CREATED,
         actor_user_id=actor.id,
         target_user_id=user.id,
-        metadata={"role": user.role.value, "member_id": user.member_id},
+        metadata={
+            "role": user.role.value,
+            "team": user.team.value,
+            "member_id": user.member_id,
+        },
     )
     db.commit()
     db.refresh(user)
@@ -76,7 +81,7 @@ def update(
 
     changes: dict[str, dict[str, str]] = {}
     role_changed = False
-    for field in ("name", "email", "member_id", "role"):
+    for field in ("name", "email", "member_id", "role", "team"):
         if field not in data or data[field] is None:
             continue
         new_value = data[field]

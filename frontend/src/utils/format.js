@@ -39,3 +39,17 @@ export function statusModifier(status) {
       return 'absent';
   }
 }
+
+export const TEAMS = [
+  { value: 'EXECUTIVE', label: 'Executives', short: 'Exec' },
+  { value: 'CORE', label: 'Core', short: 'Core' },
+  { value: 'MEMBER', label: 'Members', short: 'Member' },
+];
+
+export function teamLabel(team) {
+  return TEAMS.find((t) => t.value === team)?.label ?? 'Members';
+}
+
+export function teamShort(team) {
+  return TEAMS.find((t) => t.value === team)?.short ?? 'Member';
+}

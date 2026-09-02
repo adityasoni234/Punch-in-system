@@ -15,6 +15,7 @@ from app.schemas.admin import (
     AdminUserAttendance,
     PresenceEntry,
     PunchEventOut,
+    TeamBreakdown,
 )
 from app.schemas.attendance import DayOut, SessionOut
 from app.schemas.auth import UserPublic
@@ -47,6 +48,7 @@ def dashboard(
         present_count=snapshot["present_count"],
         absent_count=snapshot["absent_count"],
         checked_out_count=snapshot["checked_out_count"],
+        breakdown=[TeamBreakdown(**b) for b in snapshot["breakdown"]],
         present=[PresenceEntry(**e) for e in snapshot["present"]],
         absent=[PresenceEntry(**e) for e in snapshot["absent"]],
         checked_out=[PresenceEntry(**e) for e in snapshot["checked_out"]],

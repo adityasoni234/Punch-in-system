@@ -13,6 +13,19 @@ class Role(StrEnum):
     ADMIN = "ADMIN"
 
 
+class Team(StrEnum):
+    """Where a person sits in the branch structure.
+
+    Separate from `Role`: Role decides what someone may do in this system,
+    Team is who they are in the organisation. An executive is not an admin
+    unless they are also given the ADMIN role.
+    """
+
+    EXECUTIVE = "EXECUTIVE"
+    CORE = "CORE"
+    MEMBER = "MEMBER"
+
+
 class UserStatus(StrEnum):
     ACTIVE = "ACTIVE"
     DISABLED = "DISABLED"

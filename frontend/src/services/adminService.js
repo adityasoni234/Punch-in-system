@@ -4,10 +4,11 @@ export function getDashboard() {
   return api.get('/admin/dashboard');
 }
 
-export function listUsers({ search, role, status, page = 1, pageSize = 50 } = {}) {
+export function listUsers({ search, role, team, status, page = 1, pageSize = 50 } = {}) {
   const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
   if (search) params.set('search', search);
   if (role) params.set('role', role);
+  if (team) params.set('team', team);
   if (status) params.set('status', status);
   return api.get(`/admin/users?${params}`);
 }

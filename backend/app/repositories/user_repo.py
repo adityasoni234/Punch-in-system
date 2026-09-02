@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.enums import Role, UserStatus
+from app.models.enums import Role, Team, UserStatus
 from app.models.user import User
 
 
@@ -43,7 +43,10 @@ def lock_for_update(db: Session, user_id: uuid.UUID) -> User | None:
 
 
 def _base_query(
-    search: str | None, role: Role | None, status: UserStatus | None
+    search: str | None,
+    role: Role | None,
+    status: UserStatus | None,
+    team: Team | None = None,
 ) -> Select:
     stmt = select(User)
     if search:
@@ -59,6 +62,8 @@ def _base_query(
         stmt = stmt.where(User.role == role)
     if status is not None:
         stmt = stmt.where(User.status == status)
+    if team is not None:
+        stmt = stmt.where(User.team == team)
     return stmt
 
 
@@ -68,10 +73,11 @@ def list_users(
     search: str | None = None,
     role: Role | None = None,
     status: UserStatus | None = None,
+    team: Team | None = None,
     page: int = 1,
     page_size: int = 25,
 ) -> tuple[list[User], int]:
-    stmt = _base_query(search, role, status)
+    stmt = _base_query(search, role, status, team)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = list(
         db.scalars(
