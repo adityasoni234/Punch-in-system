@@ -51,6 +51,16 @@ echo "  API healthy"
 
 # ------------------------------------------------------------- the tunnel ---
 rm -f .tunnel-url
+
+# Each run mints a new hostname, so an earlier tunnel is now pointing at an
+# address nothing is built against. Close it rather than leaving orphans that
+# hold the API open to the internet.
+if pgrep -f "cloudflared tunnel --url" >/dev/null 2>&1; then
+  echo "Closing the previous tunnel ..."
+  pkill -f "cloudflared tunnel --url" || true
+  sleep 1
+fi
+
 echo "Opening the HTTPS tunnel ..."
 nohup cloudflared tunnel --url "http://127.0.0.1:${PORT}" > "${TUNNEL_LOG}" 2>&1 &
 TUNNEL_PID=$!
