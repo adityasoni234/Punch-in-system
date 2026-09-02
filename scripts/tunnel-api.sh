@@ -18,14 +18,23 @@
 #   cloudflared tunnel login && cloudflared tunnel create punchin-api
 set -euo pipefail
 
-PORT="${1:-8000}"
+PORT="${1:-${API_PORT:-8000}}"
+
+# Read only API_PORT out of .env. Sourcing the whole file would be unsafe: it
+# holds a database URL containing "&", which a shell would treat as a job
+# control operator.
+if [ -f .env ]; then
+  ENV_PORT="$(grep -E '^API_PORT=' .env | tail -1 | cut -d= -f2 | tr -d ' "')"
+  [ -n "${ENV_PORT}" ] && PORT="${PORT:-${ENV_PORT}}"
+fi
+
 
 if ! command -v cloudflared >/dev/null 2>&1; then
   echo "cloudflared is not installed:  brew install cloudflared" >&2
   exit 1
 fi
 
-if ! curl -sf "http://127.0.0.1:${PORT}/api/v1/health" >/dev/null; then
+if ! curl -sf "http://127.0.0.1:${PORT}/api/v1/health" 2>/dev/null | grep -q punch-in-system; then
   echo "No backend answering on http://127.0.0.1:${PORT}" >&2
   echo "Start it first:" >&2
   echo "  cd backend && ./.venv/bin/uvicorn app.main:app --port ${PORT}" >&2

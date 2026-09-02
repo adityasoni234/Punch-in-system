@@ -13,4 +13,11 @@ router = APIRouter(tags=["health"])
 def health(db: DbSession) -> dict:
     """Used by the PWA to distinguish 'offline' from 'backend unavailable'."""
     db.execute(text("SELECT 1"))
-    return {"status": "ok", "server_time": utcnow().isoformat()}
+    # `service` lets tooling confirm it is talking to THIS API. Ports get
+    # reused across projects, and a 200 from something else is not a signal
+    # that this app is up.
+    return {
+        "service": "punch-in-system",
+        "status": "ok",
+        "server_time": utcnow().isoformat(),
+    }

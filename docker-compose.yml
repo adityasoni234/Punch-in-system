@@ -1,20 +1,56 @@
-# Local PostgreSQL for development. The application itself is run with
-# `uvicorn` and `vite` (see README); only the database is containerised so the
-# stack stays a plain modular monolith.
+# Runs the API in a container on this machine.
+#
+# The database is Neon (free tier), so attendance data lives in the cloud and
+# survives this laptop being wiped. Only the API process is local.
+#
+#   npm run docker:up      start it
+#   npm run docker:logs    watch it
+#   npm run docker:down    stop it
+#
+# DATABASE_URL comes from the .env file next to this one (git ignored).
 services:
+  api:
+    build:
+      context: ./backend
+    image: punch-in-system:latest
+    container_name: punch-in-system
+    env_file:
+      - ./backend/.env
+    environment:
+      # Overrides whatever backend/.env says, because inside a container
+      # "localhost" is the container itself, not the host.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in the .env file at the project root}
+      # The container is the only thing that runs migrations in this setup.
+      RUN_MIGRATIONS_ON_START: "true"
+    ports:
+      # Host port is configurable because Docker Desktop can leave a stale
+      # forward holding a port even with no container attached. 8080 is what
+      # the image listens on inside the container.
+      - "${API_PORT:-8000}:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # Local PostgreSQL, only if you want to run without Neon:
+  #   docker compose --profile local-db up -d
   db:
+    profiles: ["local-db"]
     image: postgres:16-alpine
-    container_name: punchin-db
+    container_name: punch-in-system-db
     environment:
       POSTGRES_USER: punchin
       POSTGRES_PASSWORD: punchin
       POSTGRES_DB: punchin
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
       - punchin_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U punchin']
+      test: ["CMD-SHELL", "pg_isready -U punchin"]
       interval: 5s
       timeout: 3s
       retries: 10

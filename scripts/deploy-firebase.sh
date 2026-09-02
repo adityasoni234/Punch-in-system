@@ -52,7 +52,7 @@ else
 echo "Checking the API is reachable at ${API_URL} ..."
 REACHABLE=0
 for attempt in $(seq 1 20); do
-  if curl -sf --max-time 8 "${API_URL}/api/v1/health" >/dev/null 2>&1; then
+  if curl -sf --max-time 8 "${API_URL}/api/v1/health" 2>/dev/null | grep -q punch-in-system; then
     REACHABLE=1
     break
   fi

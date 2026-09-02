@@ -14,14 +14,25 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-PORT="${PORT:-8000}"
+PORT="${PORT:-${API_PORT:-8000}}"
+
+# Read only API_PORT out of .env. Sourcing the whole file would be unsafe: it
+# holds a database URL containing "&", which a shell would treat as a job
+# control operator.
+if [ -f .env ]; then
+  ENV_PORT="$(grep -E '^API_PORT=' .env | tail -1 | cut -d= -f2 | tr -d ' "')"
+  [ -n "${ENV_PORT}" ] && PORT="${PORT:-${ENV_PORT}}"
+fi
+
 LOG_DIR=".run"
 mkdir -p "${LOG_DIR}"
 API_LOG="${LOG_DIR}/api.log"
 TUNNEL_LOG="${LOG_DIR}/tunnel.log"
 
 # ---------------------------------------------------------------- the API ---
-if curl -sf --max-time 3 "http://127.0.0.1:${PORT}/api/v1/health" >/dev/null 2>&1; then
+if curl -sf --max-time 3 "http://127.0.0.1:${PORT}/api/v1/health" 2>/dev/null | grep -q punch-in-system; then
+  # Either the container (npm run docker:up) or a local uvicorn. Either way
+  # something healthy is already answering, so leave it alone.
   echo "API already running on :${PORT}"
 else
   echo "Starting the API on :${PORT} ..."
@@ -35,13 +46,13 @@ else
   )
 
   for _ in $(seq 1 30); do
-    if curl -sf --max-time 2 "http://127.0.0.1:${PORT}/api/v1/health" >/dev/null 2>&1; then
+    if curl -sf --max-time 2 "http://127.0.0.1:${PORT}/api/v1/health" 2>/dev/null | grep -q punch-in-system; then
       break
     fi
     sleep 1
   done
 
-  if ! curl -sf --max-time 3 "http://127.0.0.1:${PORT}/api/v1/health" >/dev/null 2>&1; then
+  if ! curl -sf --max-time 3 "http://127.0.0.1:${PORT}/api/v1/health" 2>/dev/null | grep -q punch-in-system; then
     echo "The API did not come up. Last lines of ${API_LOG}:" >&2
     tail -20 "${API_LOG}" >&2
     exit 1
@@ -85,7 +96,7 @@ echo "  Tunnel live: ${URL}"
 # A brand new quick-tunnel hostname often takes a minute or two to resolve.
 echo "  waiting for the hostname to resolve ..."
 for _ in $(seq 1 45); do
-  curl -sf --max-time 5 "${URL}/api/v1/health" >/dev/null 2>&1 && break
+  curl -sf --max-time 5 "${URL}/api/v1/health" 2>/dev/null | grep -q punch-in-system && break
   sleep 4
 done
 
