@@ -30,8 +30,26 @@ class LimitPolicy:
 
 
 def login_policy() -> LimitPolicy:
+    """Per-account limit: strict, because this is what stops brute force."""
     return LimitPolicy(
         "login", settings.rate_limit_login_max, settings.rate_limit_login_window_seconds
+    )
+
+
+def login_ip_policy() -> LimitPolicy:
+    """Per-network limit: generous, because shared NAT is normal."""
+    return LimitPolicy(
+        "login_ip",
+        settings.rate_limit_login_ip_max,
+        settings.rate_limit_login_window_seconds,
+    )
+
+
+def register_policy() -> LimitPolicy:
+    return LimitPolicy(
+        "register",
+        settings.rate_limit_register_max,
+        settings.rate_limit_register_window_seconds,
     )
 
 
@@ -91,6 +109,46 @@ def enforce(db: Session, policy: LimitPolicy, identifier: str) -> None:
             "Too many attempts. Please wait "
             f"{retry_after} second{'s' if retry_after != 1 else ''} and try again.",
         )
+
+
+def assert_within(db: Session, policy: LimitPolicy, identifier: str) -> None:
+    """Reject if the window is already exhausted, WITHOUT consuming budget.
+
+    Pair with `record_failure` so only failed attempts count. Charging a
+    successful sign-in against the limit is what locks people out of an
+    account they can actually log into.
+    """
+    now = utcnow()
+    window_start = _window_start(now, policy.window_seconds)
+    count = (
+        db.scalar(
+            select(RateLimitBucket.count).where(
+                RateLimitBucket.key == _key(policy, identifier),
+                RateLimitBucket.window_start == window_start,
+            )
+        )
+        or 0
+    )
+    if count >= policy.max_requests:
+        expires_at = window_start + timedelta(seconds=policy.window_seconds)
+        retry_after = max(1, int((expires_at - now).total_seconds()))
+        raise RateLimitedError(
+            retry_after,
+            "Too many failed attempts for this account. Please wait "
+            f"{retry_after} second{'s' if retry_after != 1 else ''} and try again.",
+        )
+
+
+def record_failure(db: Session, policy: LimitPolicy, identifier: str) -> None:
+    hit(db, policy, identifier)
+
+
+def clear(db: Session, policy: LimitPolicy, identifier: str) -> None:
+    """Wipe the window after a success, so a wrong guess then a correct one
+    does not leave the account part-way to a lockout."""
+    db.execute(
+        delete(RateLimitBucket).where(RateLimitBucket.key == _key(policy, identifier))
+    )
 
 
 def peek(db: Session, policy: LimitPolicy, identifier: str) -> int:

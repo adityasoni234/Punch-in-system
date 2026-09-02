@@ -128,3 +128,69 @@ def test_admin_role_is_visible_in_the_session(client, db):
     token = login(client, boss.email)
     body = client.get("/api/v1/auth/me", headers=auth(token)).json()
     assert body["user"]["role"] == "ADMIN"
+
+
+def test_successful_logins_do_not_consume_the_account_limit(client, db):
+    """Signing in correctly must never lock you out of your own account."""
+    person = make_user(db)
+    for _ in range(8):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"identifier": person.email, "password": "CorrectHorse99"},
+        )
+        assert response.status_code == 200, response.text
+
+
+def test_a_success_clears_earlier_failures(client, db):
+    person = make_user(db)
+    for _ in range(3):
+        client.post(
+            "/api/v1/auth/login",
+            json={"identifier": person.email, "password": "wrong-password"},
+        )
+    assert login(client, person.email)  # succeeds, and resets the window
+    for _ in range(4):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"identifier": person.email, "password": "wrong-password"},
+        )
+    assert response.status_code == 401  # still counting from zero, not locked
+
+
+def test_one_account_lockout_does_not_block_another_person(client, db):
+    """Everyone on a campus network shares one IP; one person exhausting their
+    own attempts must not lock out their colleagues."""
+    victim = make_user(db)
+    bystander = make_user(db)
+
+    for _ in range(7):
+        client.post(
+            "/api/v1/auth/login",
+            json={"identifier": victim.email, "password": "wrong-password"},
+        )
+    locked = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": victim.email, "password": "CorrectHorse99"},
+    )
+    assert locked.status_code == 429
+
+    ok = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": bystander.email, "password": "CorrectHorse99"},
+    )
+    assert ok.status_code == 200
+
+
+def test_many_people_can_register_from_one_network(client, workspace):
+    """A whole cohort signing up together on shared WiFi must not be blocked."""
+    for index in range(15):
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "name": f"Person {index}",
+                "email": f"person{index}@example.com",
+                "member_id": f"ENR20260{index:03d}",
+                "password": "CohortPass2026",
+            },
+        )
+        assert response.status_code == 201, f"blocked at signup {index}: {response.text}"

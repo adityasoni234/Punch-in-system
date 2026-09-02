@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.core.config import settings
-from app.core.deps import CurrentUser, DbSession, login_rate_limit
+from app.core.deps import CurrentUser, DbSession, login_rate_limit, register_rate_limit
 from app.core.errors import NotAuthenticatedError
 from app.core.time import utcnow
 from app.repositories import workspace_repo
@@ -66,20 +66,29 @@ def login(
     response: Response,
     db: DbSession,
 ) -> SessionInfo:
-    # A second, per-account limit so one attacker cannot spread a password
-    # spray for a single account across many source addresses.
-    rate_limit.enforce(
-        db, rate_limit.login_policy(), f"id:{payload.identifier.lower()}"
-    )
+    # Per-account limit, so a password spray against one account cannot be
+    # spread across many source addresses. Checked without consuming budget:
+    # only failures count, and a success clears the window. Otherwise signing
+    # in correctly five times would lock you out of your own account.
+    account_key = f"id:{payload.identifier.lower()}"
+    rate_limit.assert_within(db, rate_limit.login_policy(), account_key)
     db.commit()
 
-    issued = auth_service.login(
-        db,
-        identifier=payload.identifier,
-        password=payload.password,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=getattr(request.state, "client_ip", None),
-    )
+    try:
+        issued = auth_service.login(
+            db,
+            identifier=payload.identifier,
+            password=payload.password,
+            user_agent=request.headers.get("user-agent"),
+            ip_address=getattr(request.state, "client_ip", None),
+        )
+    except Exception:
+        rate_limit.record_failure(db, rate_limit.login_policy(), account_key)
+        db.commit()
+        raise
+
+    rate_limit.clear(db, rate_limit.login_policy(), account_key)
+    db.commit()
     _set_refresh_cookie(response, issued.refresh_token)
     return SessionInfo(
         access_token=issued.access_token,
@@ -94,7 +103,7 @@ def login(
     "/register",
     response_model=SessionInfo,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(login_rate_limit)],
+    dependencies=[Depends(register_rate_limit)],
     summary="Create a member account",
 )
 def register(

@@ -53,8 +53,17 @@ class Settings(BaseSettings):
     cors_origins: str = ""
 
     # -- Rate limiting ----------------------------------------------------
+    # Per ACCOUNT. This is the brute-force defence and stays strict.
     rate_limit_login_max: int = 5
     rate_limit_login_window_seconds: int = 900
+    # Per IP. Everyone on one office or campus network shares a public
+    # address, so this must be generous or one person's attempts lock out the
+    # whole building. It exists to stop a flood, not to protect an account.
+    rate_limit_login_ip_max: int = 60
+    # Sign up is not a credential-guessing endpoint; duplicate email and
+    # enrollment checks already bound what it can create.
+    rate_limit_register_max: int = 30
+    rate_limit_register_window_seconds: int = 900
     rate_limit_punch_max: int = 10
     rate_limit_punch_window_seconds: int = 60
     rate_limit_global_max: int = 300

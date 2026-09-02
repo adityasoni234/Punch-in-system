@@ -95,6 +95,17 @@ def punch_rate_limit(request: Request, db: DbSession, user: CurrentUser) -> None
 
 
 def login_rate_limit(request: Request, db: DbSession) -> None:
+    """Flood protection for a whole network, not a per-account lockout.
+
+    A campus or office shares one public address, so this deliberately allows
+    far more than the per-account limit does.
+    """
     ip = getattr(request.state, "client_ip", None) or "unknown"
-    rate_limit.enforce(db, rate_limit.login_policy(), f"ip:{ip}")
+    rate_limit.enforce(db, rate_limit.login_ip_policy(), f"ip:{ip}")
+    db.commit()
+
+
+def register_rate_limit(request: Request, db: DbSession) -> None:
+    ip = getattr(request.state, "client_ip", None) or "unknown"
+    rate_limit.enforce(db, rate_limit.register_policy(), f"ip:{ip}")
     db.commit()
