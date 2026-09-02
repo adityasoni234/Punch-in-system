@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 #
-# Deploys the API to Cloud Run in the same Google project as Firebase Hosting.
+# Deploys the API to Cloud Run, backed by Cloud SQL, in the same Google project
+# as Firebase Hosting.
 #
-# Why this one: Hosting can rewrite /api/** to a Cloud Run service, which puts
-# the app and the API on ONE origin. That removes CORS entirely and lets the
-# refresh cookie go back to SameSite=Lax, which is a stronger position than any
-# split-origin deployment.
+# Why this shape: Hosting can rewrite /api/** to a Cloud Run service, which
+# puts the app and the API on ONE origin. That removes CORS entirely and lets
+# the refresh cookie go back to SameSite=Lax -- a stronger position than any
+# split-origin deployment, and no laptop or tunnel in the path.
 #
 #   ./scripts/deploy-cloudrun.sh
 #
-# Prerequisites: gcloud CLI, the Blaze plan on the Firebase project, and a
-# DATABASE_URL for a reachable PostgreSQL (Neon/Supabase free tier is fine).
+# Prerequisites:
+#   * gcloud CLI, authenticated:      gcloud auth login
+#   * Blaze (pay-as-you-go) billing on the project
+#   * a Cloud SQL instance:           ./scripts/create-cloudsql.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -18,17 +21,27 @@ cd "$(dirname "$0")/.."
 PROJECT="${GCP_PROJECT:-punchin-7c498}"
 REGION="${GCP_REGION:-asia-south1}"
 SERVICE="${GCP_SERVICE:-punchin-api}"
+INSTANCE="${CLOUDSQL_INSTANCE:-punchin-db}"
+DB_NAME="${DB_NAME:-punchin}"
+DB_USER="${DB_USER:-punchin}"
 
 if ! command -v gcloud >/dev/null 2>&1; then
   echo "gcloud is not installed:  brew install --cask google-cloud-sdk" >&2
   exit 1
 fi
 
-if [ -z "${DATABASE_URL:-}" ]; then
-  echo "Set DATABASE_URL to your managed PostgreSQL connection string:" >&2
-  echo "  export DATABASE_URL='postgresql://user:pass@host/db?sslmode=require'" >&2
+if [ -z "${DB_PASSWORD:-}" ]; then
+  echo "Set the database password that create-cloudsql.sh printed:" >&2
+  echo "  export DB_PASSWORD='...'" >&2
   exit 1
 fi
+
+CONNECTION_NAME="${PROJECT}:${REGION}:${INSTANCE}"
+
+# Cloud Run mounts the Cloud SQL socket at /cloudsql/<connection name>, so the
+# host is a directory path rather than a hostname. No IP allowlisting, no TLS
+# config, and the database is never exposed to the internet.
+DATABASE_URL="postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@/${DB_NAME}?host=/cloudsql/${CONNECTION_NAME}"
 
 # Reuse the existing signing key so live sessions survive the move.
 if [ -s backend/.secret_key ]; then
@@ -42,38 +55,49 @@ fi
 
 gcloud config set project "${PROJECT}" >/dev/null
 
+echo "Enabling the APIs this needs ..."
+gcloud services enable run.googleapis.com sqladmin.googleapis.com \
+  secretmanager.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
+  >/dev/null
+
 echo "Storing secrets in Secret Manager ..."
-for pair in "punchin-secret-key=${SECRET_KEY}" "punchin-database-url=${DATABASE_URL}"; do
-  name="${pair%%=*}"
-  value="${pair#*=}"
+store_secret() {
+  local name="$1" value="$2"
   if gcloud secrets describe "${name}" >/dev/null 2>&1; then
     printf '%s' "${value}" | gcloud secrets versions add "${name}" --data-file=- >/dev/null
   else
     printf '%s' "${value}" | gcloud secrets create "${name}" --data-file=- >/dev/null
   fi
-done
+}
+store_secret punchin-secret-key "${SECRET_KEY}"
+store_secret punchin-database-url "${DATABASE_URL}"
 
 echo "Deploying ${SERVICE} to ${REGION} ..."
+# CORS_ORIGINS is empty and the cookie is Lax because Hosting serves the API
+# from the app's own origin. --allow-unauthenticated is correct: this is the
+# public API and it does its own authentication.
 gcloud run deploy "${SERVICE}" \
   --source backend \
   --region "${REGION}" \
   --allow-unauthenticated \
+  --add-cloudsql-instances "${CONNECTION_NAME}" \
   --set-secrets "SECRET_KEY=punchin-secret-key:latest,DATABASE_URL=punchin-database-url:latest" \
   --set-env-vars "ENVIRONMENT=production,DEBUG=false,COOKIE_SECURE=true,COOKIE_SAMESITE=lax,TRUST_PROXY_HEADERS=true,RUN_MIGRATIONS_ON_START=true,CORS_ORIGINS=,DB_POOL_SIZE=5,DB_MAX_OVERFLOW=5" \
   --min-instances 0 --max-instances 4 --cpu 1 --memory 512Mi --port 8080
 
+URL="$(gcloud run services describe "${SERVICE}" --region "${REGION}" --format 'value(status.url)')"
+echo
+echo "Service URL: ${URL}"
+curl -sf --max-time 30 "${URL}/api/v1/health" && echo || echo "(health check did not answer yet; check the logs)"
+
 cat <<MSG
 
-Cloud Run is up. Now put the rewrite back into firebase.json, BEFORE the SPA
-fallback, so the API is served from the app's own origin:
+The schema was applied at boot (RUN_MIGRATIONS_ON_START). Next:
 
-  { "source": "/api/**", "run": { "serviceId": "${SERVICE}", "region": "${REGION}" } }
+  1. Create the workspace and your admin account on the new database:
+       ./scripts/bootstrap-remote.sh
 
-Then clear the split-origin build and redeploy the PWA:
+  2. Point Hosting at Cloud Run and go same-origin:
+       ./scripts/use-same-origin.sh
 
-  rm -f frontend/.env.production
-  npm run deploy
-
-Same origin means no CORS and a SameSite=Lax cookie, so you can also drop
-COOKIE_SAMESITE=none from the service afterwards.
 MSG

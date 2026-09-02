@@ -132,7 +132,41 @@ and needs no rebuild when the URL changes.
 
 ---
 
-## Option A — Same origin, Cloud Run (most robust)
+## Option A — Same origin, Cloud Run + Cloud SQL  ← the chosen path
+
+Fully scripted. Two things only you can do: authenticate, and put the project
+on the Blaze plan (Hosting rewrites to Cloud Run are not available on Spark).
+
+```bash
+gcloud auth login                       # you
+# console.firebase.google.com -> punchin-7c498 -> upgrade to Blaze   # you
+
+./scripts/create-cloudsql.sh            # instance + database + user, ~10 min
+export DB_PASSWORD='<printed above>'
+./scripts/deploy-cloudrun.sh            # builds, stores secrets, deploys, migrates
+./scripts/bootstrap-remote.sh --admin "Your Name" you@example.com ADM001
+./scripts/use-same-origin.sh            # Hosting rewrite + rebuild + redeploy
+```
+
+Afterwards `https://punchin-7c498.web.app/api/v1/health` returns JSON rather
+than HTML, and the laptop backend and tunnel can be shut down for good.
+
+What each piece costs: Cloud Run scales to zero, so it is near free at this
+volume. Cloud SQL does **not** scale to zero — the smallest tier bills
+continuously, roughly $8–10 a month. That is the trade for the private socket
+and the managed backups.
+
+### Why same origin is worth the move
+
+| | Tunnel (today) | Cloud Run (after) |
+|---|---|---|
+| Uptime | laptop must be awake | managed |
+| API URL | changes every restart | fixed |
+| CORS | required | none |
+| Refresh cookie | `SameSite=None` | `SameSite=Lax` |
+| Redeploy on restart | yes | no |
+
+### The old manual walkthrough
 
 
 ```
