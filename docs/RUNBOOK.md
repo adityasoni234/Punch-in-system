@@ -51,58 +51,69 @@ Part B removes all three.
 
 ---
 
-## B. Make it permanent (Cloud Run + Cloud SQL)
+## B. Make it permanent — free (Cloud Run + Neon)
 
-Do this once and the tunnel is never needed again.
+Do this once and the tunnel is never needed again. Cost is ₹0: Cloud Run's
+free tier covers far more than this app will use, and Neon's Postgres free
+tier needs no payment details at all.
 
-### Step 1 — Sign in to Google (only you can)
+Blaze does require a card on the Google project even though the usage is
+free — Firebase cannot forward `/api/**` to a backend on the Spark plan.
+
+### Step 1 — Get a free database (browser)
+
+1. Sign up at <https://neon.tech> (free, no card)
+2. Create a project, region **AWS ap-south-1 (Mumbai)** if offered
+3. Copy the connection string. It looks like:
+
+```
+postgresql://user:password@ep-something.ap-south-1.aws.neon.tech/neondb?sslmode=require
+```
+
+### Step 2 — Sign in to Google and enable billing (browser + terminal)
 
 ```bash
 gcloud auth login
 ```
 
-### Step 2 — Turn on billing (only you can)
+Then upgrade to **Blaze** at
+<https://console.firebase.google.com/project/punchin-7c498/usage/details>.
+Set a budget alert of a dollar or two while you are there, so any surprise is
+caught early.
 
-Open <https://console.firebase.google.com/project/punchin-7c498/usage/details>
-and upgrade to the **Blaze** plan. Firebase cannot forward `/api/**` to a
-backend on the free Spark plan.
-
-### Step 3 — Create the database (~10 minutes)
-
-```bash
-./scripts/create-cloudsql.sh
-```
-
-It prints a password at the end. Copy it.
-
-### Step 4 — Deploy the API
+### Step 3 — Deploy the API
 
 ```bash
-export DB_PASSWORD='paste-the-password-from-step-3'
+export DATABASE_URL='paste-the-neon-connection-string-here'
 ./scripts/deploy-cloudrun.sh
 ```
 
-### Step 5 — Create the workspace and your admin account
+The schema is created automatically on first boot. The `postgresql://` form
+Neon gives you is rewritten to the driver this app uses, so paste it as-is.
+
+### Step 4 — Create the workspace and your admin account
+
+Keep the same terminal (it still has `DATABASE_URL` exported):
 
 ```bash
 ./scripts/bootstrap-remote.sh --admin "Aditya Soni" adityaksoni234@gmail.com ADM001
 ```
 
-It prints a temporary password. Copy it — it is shown once.
+It prints a temporary password. Copy it — shown once.
 
-### Step 6 — Point the app at the new API
+### Step 5 — Point the app at the new API
 
 ```bash
 ./scripts/use-same-origin.sh
 ```
 
-### Step 7 — Check it worked
+### Step 6 — Check it worked
 
 ```bash
 curl -s https://punchin-7c498.web.app/api/v1/health
 ```
 
-**JSON** = done. **HTML** = something above did not finish.
+**JSON** = done. **HTML** = a step above did not finish.
 
 Then stop the laptop backend for good:
 
@@ -110,7 +121,23 @@ Then stop the laptop backend for good:
 npm run stop
 ```
 
----
+### What changes after this
+
+| | Tunnel (today) | Cloud Run + Neon |
+|---|---|---|
+| Uptime | laptop must be awake | always |
+| API URL | new one every restart | fixed |
+| Redeploy after restart | every time | never |
+| CORS | required | none |
+| Refresh cookie | `SameSite=None` | `SameSite=Lax` |
+| Cost | ₹0 | ₹0 |
+
+### If you would rather use Cloud SQL
+
+Leave `DATABASE_URL` unset and run `./scripts/create-cloudsql.sh` first, then
+`export DB_PASSWORD='...'` before `deploy-cloudrun.sh`. It is a tighter
+integration over a private socket, but it bills roughly $8–10 a month because
+the instance never scales to zero.
 
 ## C. Using the app
 
