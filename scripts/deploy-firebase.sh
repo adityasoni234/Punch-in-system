@@ -40,11 +40,33 @@ case "${API_URL}" in
     ;;
 esac
 
+# A freshly minted quick-tunnel hostname can take a couple of minutes to
+# resolve everywhere, so retry rather than failing on the first attempt.
 echo "Checking the API is reachable at ${API_URL} ..."
-if ! curl -sf --max-time 10 "${API_URL}/api/v1/health" >/dev/null; then
-  echo "No healthy API at ${API_URL}/api/v1/health" >&2
-  echo "Start the backend and the tunnel first." >&2
-  exit 1
+REACHABLE=0
+for attempt in $(seq 1 20); do
+  if curl -sf --max-time 8 "${API_URL}/api/v1/health" >/dev/null 2>&1; then
+    REACHABLE=1
+    break
+  fi
+  [ "${attempt}" = "1" ] && echo "  not answering yet; retrying for up to 2 minutes ..."
+  sleep 6
+done
+
+if [ "${REACHABLE}" != "1" ]; then
+  if [ "${FORCE:-}" = "1" ]; then
+    echo "  still unreachable, but FORCE=1 was set -- deploying anyway." >&2
+  else
+    echo "No healthy API at ${API_URL}/api/v1/health" >&2
+    echo >&2
+    echo "Check, in this order:" >&2
+    echo "  1. the API answers locally:  curl http://127.0.0.1:8000/api/v1/health" >&2
+    echo "  2. the tunnel is running:    tail .run/tunnel.log" >&2
+    echo "  3. the hostname resolves:    dig +short ${API_URL#https://}" >&2
+    echo >&2
+    echo "If it resolves for you but not here, re-run with:  FORCE=1 $0" >&2
+    exit 1
+  fi
 fi
 
 echo "Writing frontend/.env.production"
