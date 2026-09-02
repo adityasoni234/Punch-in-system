@@ -66,6 +66,33 @@ fi
 
 gcloud config set project "${PROJECT}" >/dev/null
 
+# Enabling any API fails with a wall of JSON if billing is off, and the real
+# message is buried in it. Check first and say it plainly.
+if ! gcloud services list --available --filter="name:run.googleapis.com" \
+     --format='value(name)' >/dev/null 2>&1; then
+  :
+fi
+BILLING="$(gcloud beta billing projects describe "${PROJECT}" \
+  --format='value(billingEnabled)' 2>/dev/null || echo "")"
+if [ "${BILLING}" = "False" ]; then
+  cat >&2 <<MSG
+
+Billing is not enabled on ${PROJECT}, so Cloud Run cannot be used yet.
+
+Open this and upgrade to the Blaze (pay-as-you-go) plan:
+
+  https://console.firebase.google.com/project/${PROJECT}/usage/details
+
+Blaze needs a card on file, but this deployment stays inside the always-free
+tiers: Cloud Run gives 2 million requests a month and the database is Neon's
+free plan. Set a budget alert of a dollar or two while you are in there.
+
+Then run this script again.
+
+MSG
+  exit 1
+fi
+
 echo "Enabling the APIs this needs ..."
 gcloud services enable run.googleapis.com secretmanager.googleapis.com \
   cloudbuild.googleapis.com artifactregistry.googleapis.com >/dev/null
