@@ -19,4 +19,15 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       // A failed registration only costs offline shell caching; the app works.
     });
   });
+
+  // A tab left open across a deploy keeps running the old JavaScript, which
+  // shows up as fixed behaviour "not working". The new worker calls
+  // skipWaiting, so when it takes control the page is stale by definition:
+  // reload once to pick up the new build.
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
 }
