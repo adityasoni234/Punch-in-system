@@ -40,6 +40,13 @@ case "${API_URL}" in
     ;;
 esac
 
+# FORCE=1 means the caller has already confirmed the API is up, so skip the
+# check entirely rather than making them sit through the retries first.
+if [ "${FORCE:-}" = "1" ]; then
+  echo "FORCE=1 -- skipping the reachability check for ${API_URL}"
+  REACHABLE=1
+else
+
 # A freshly minted quick-tunnel hostname can take a couple of minutes to
 # resolve everywhere, so retry rather than failing on the first attempt.
 echo "Checking the API is reachable at ${API_URL} ..."
@@ -54,19 +61,17 @@ for attempt in $(seq 1 20); do
 done
 
 if [ "${REACHABLE}" != "1" ]; then
-  if [ "${FORCE:-}" = "1" ]; then
-    echo "  still unreachable, but FORCE=1 was set -- deploying anyway." >&2
-  else
-    echo "No healthy API at ${API_URL}/api/v1/health" >&2
-    echo >&2
-    echo "Check, in this order:" >&2
-    echo "  1. the API answers locally:  curl http://127.0.0.1:8000/api/v1/health" >&2
-    echo "  2. the tunnel is running:    tail .run/tunnel.log" >&2
-    echo "  3. the hostname resolves:    dig +short ${API_URL#https://}" >&2
-    echo >&2
-    echo "If it resolves for you but not here, re-run with:  FORCE=1 $0" >&2
-    exit 1
-  fi
+  echo "No healthy API at ${API_URL}/api/v1/health" >&2
+  echo >&2
+  echo "Check, in this order:" >&2
+  echo "  1. the API answers locally:  curl http://127.0.0.1:8000/api/v1/health" >&2
+  echo "  2. the tunnel is running:    tail .run/tunnel.log" >&2
+  echo "  3. the hostname resolves:    dig +short ${API_URL#https://}" >&2
+  echo >&2
+  echo "If it resolves for you but not here, re-run with:  FORCE=1 $0" >&2
+  exit 1
+fi
+
 fi
 
 echo "Writing frontend/.env.production"
