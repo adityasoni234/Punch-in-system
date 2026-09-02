@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
-import { MapPin, Save } from 'lucide-react';
+import { KeyRound, LogOut, MapPin, Save } from 'lucide-react';
 import {
+  Badge,
   Button,
   Card,
   CardTitle,
   ErrorState,
   Field,
   Input,
+  KeyValue,
   Notice,
   Select,
   SkeletonCard,
 } from '../../components/common/index.jsx';
+import { useNavigate } from 'react-router-dom';
 import { useAsync } from '../../hooks/useAsync.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { getWorkspace, updateWorkspace } from '../../services/adminService.js';
 
@@ -29,6 +33,8 @@ const TIMEZONES = [
 
 export default function AdminSettings() {
   const toast = useToast();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const { data, error, loading, reload } = useAsync(() => getWorkspace(), []);
   const [form, setForm] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -254,6 +260,41 @@ export default function AdminSettings() {
       <Button type="submit" variant="primary" block icon={Save} loading={busy}>
         Save settings
       </Button>
+
+      <Card>
+        <CardTitle>Your account</CardTitle>
+        <div className="row" style={{ marginBottom: 'var(--sp-3)' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 660 }}>{user?.name}</div>
+            <div className="tiny">{user?.email}</div>
+          </div>
+          <Badge variant="info">ADMIN</Badge>
+        </div>
+        <KeyValue label="Member ID">{user?.member_id}</KeyValue>
+        <div className="stack" style={{ marginTop: 'var(--sp-4)' }}>
+          <Button
+            type="button"
+            variant="outline"
+            block
+            icon={KeyRound}
+            onClick={() => navigate('/change-password')}
+          >
+            Change password
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            block
+            icon={LogOut}
+            onClick={async () => {
+              await signOut();
+              navigate('/login', { replace: true });
+            }}
+          >
+            Sign out
+          </Button>
+        </div>
+      </Card>
     </form>
   );
 }

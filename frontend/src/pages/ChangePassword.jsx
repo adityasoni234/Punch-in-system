@@ -33,9 +33,9 @@ export default function ChangePassword() {
     try {
       await changePassword(current, next);
       // Changing the password revokes every session, so sign in again silently.
-      await signIn(user.email, next);
+      const session = await signIn(user.email, next);
       toast.success('Password updated.');
-      navigate('/', { replace: true });
+      navigate(session.user.role === 'ADMIN' ? '/admin' : '/', { replace: true });
     } catch (caught) {
       setError(caught.message);
     } finally {

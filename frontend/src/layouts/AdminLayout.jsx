@@ -1,5 +1,5 @@
 import { Outlet, useNavigate } from 'react-router-dom';
-import { CalendarRange, LayoutDashboard, Settings, ShieldCheck, Users } from 'lucide-react';
+import { CalendarRange, LayoutDashboard, LogOut, Settings, ShieldCheck, Users } from 'lucide-react';
 import { AppHeader, BottomNav, MobileShell } from '../components/layout/MobileShell.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -12,8 +12,13 @@ const NAV = [
 ];
 
 export default function AdminLayout() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <MobileShell
@@ -22,12 +27,8 @@ export default function AdminLayout() {
           title="Admin"
           subtitle={user?.name}
           action={
-            <button
-              className="icon-button"
-              onClick={() => navigate('/')}
-              aria-label="Switch to my attendance"
-            >
-              <LayoutDashboard size={19} />
+            <button className="icon-button" onClick={handleSignOut} aria-label="Sign out">
+              <LogOut size={19} />
             </button>
           }
         />

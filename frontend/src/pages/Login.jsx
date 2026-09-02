@@ -48,9 +48,12 @@ export default function Login() {
     setBusy(true);
     try {
       const session = await signIn(identifier.trim(), password);
-      navigate(session.user.must_change_password ? '/change-password' : '/', {
-        replace: true,
-      });
+      const destination = session.user.must_change_password
+        ? '/change-password'
+        : session.user.role === 'ADMIN'
+          ? '/admin'
+          : '/';
+      navigate(destination, { replace: true });
     } catch (caught) {
       if (caught instanceof ApiError) {
         const fields = caught.details?.fields;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { KeyRound, LogOut, MapPin, ShieldCheck, TrendingUp } from 'lucide-react';
+import { KeyRound, LogOut, MapPin, TrendingUp } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -24,7 +24,7 @@ const PERIODS = [
 ];
 
 export default function Profile() {
-  const { user, workspace, signOut, isAdmin } = useAuth();
+  const { user, workspace, signOut } = useAuth();
   const navigate = useNavigate();
   const [period, setPeriod] = useState('week');
   const { data, error, loading, reload } = useAsync(() => getSummary({ period }), [period]);
@@ -108,12 +108,6 @@ export default function Profile() {
           live timer is calculated from timestamps, not from your position.
         </p>
       </Card>
-
-      {isAdmin && (
-        <Button variant="outline" block icon={ShieldCheck} onClick={() => navigate('/admin')}>
-          Open admin
-        </Button>
-      )}
 
       <Button
         variant="outline"

@@ -32,6 +32,20 @@ function RequireAuth({ children }) {
   return children;
 }
 
+/**
+ * Administrators do not use the member app.
+ *
+ * An admin account exists to oversee attendance, not to record it, so the
+ * punch screens are not merely hidden from them -- they are routed away from
+ * them entirely, and the member shell is never rendered.
+ */
+function MembersOnly({ children }) {
+  const { isAdmin, booting } = useAuth();
+  if (booting) return <BootScreen />;
+  if (isAdmin) return <Navigate to="/admin" replace />;
+  return children;
+}
+
 function RequireAdmin({ children }) {
   const { isAdmin, booting } = useAuth();
   if (booting) return <BootScreen />;
@@ -40,10 +54,20 @@ function RequireAdmin({ children }) {
 }
 
 function RedirectIfAuthenticated({ children }) {
-  const { isAuthenticated, booting, mustChangePassword } = useAuth();
+  const { isAuthenticated, isAdmin, booting, mustChangePassword } = useAuth();
   if (booting) return <BootScreen />;
-  if (isAuthenticated) return <Navigate to={mustChangePassword ? '/change-password' : '/'} replace />;
+  if (isAuthenticated) {
+    if (mustChangePassword) return <Navigate to="/change-password" replace />;
+    return <Navigate to={isAdmin ? '/admin' : '/'} replace />;
+  }
   return children;
+}
+
+/** Unknown paths land wherever that account actually belongs. */
+function HomeForRole() {
+  const { isAdmin, booting } = useAuth();
+  if (booting) return <BootScreen />;
+  return <Navigate to={isAdmin ? '/admin' : '/'} replace />;
 }
 
 function BootScreen() {
@@ -86,7 +110,9 @@ export default function AppRoutes() {
       <Route
         element={
           <RequireAuth>
-            <AppLayout />
+            <MembersOnly>
+              <AppLayout />
+            </MembersOnly>
           </RequireAuth>
         }
       >
@@ -113,7 +139,7 @@ export default function AppRoutes() {
         <Route path="settings" element={<AdminSettings />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<HomeForRole />} />
     </Routes>
   );
 }
