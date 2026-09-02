@@ -8,6 +8,7 @@ handler.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -26,10 +27,30 @@ from app.middleware.security_headers import SecurityHeadersMiddleware
 logger = get_logger(__name__)
 
 
+def _run_migrations() -> None:
+    """Apply Alembic migrations in-process at boot.
+
+    For hosts with no release phase. Concurrent instances are safe: Alembic
+    takes a lock on alembic_version, so the second one waits and then finds
+    nothing to do.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    config = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
+    config.set_main_option("script_location", str(Path(__file__).resolve().parent / "db" / "migrations"))
+    config.set_main_option("sqlalchemy.url", settings.database_url)
+    logger.info("Applying database migrations ...")
+    command.upgrade(config, "head")
+    logger.info("Migrations up to date")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
     settings.validate_runtime()
+    if settings.run_migrations_on_start:
+        _run_migrations()
     logger.info(
         "Starting %s (%s) api_prefix=%s", settings.app_name, settings.environment,
         settings.api_prefix,

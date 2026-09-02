@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import AppLayout from '../layouts/AppLayout.jsx';
 import AdminLayout from '../layouts/AdminLayout.jsx';
 import Login from '../pages/Login.jsx';
+import Register from '../pages/Register.jsx';
 import ChangePassword from '../pages/ChangePassword.jsx';
 import Dashboard from '../pages/Dashboard.jsx';
 import History from '../pages/History.jsx';
@@ -62,6 +63,14 @@ export default function AppRoutes() {
         element={
           <RedirectIfAuthenticated>
             <Login />
+          </RedirectIfAuthenticated>
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          <RedirectIfAuthenticated>
+            <Register />
           </RedirectIfAuthenticated>
         }
       />

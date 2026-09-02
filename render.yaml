@@ -1,0 +1,46 @@
+# Render blueprint — one always-on home for the API.
+#
+# Deploy: push this repo to GitHub, then in Render choose
+# "New +" -> "Blueprint" and point it at the repo. Set the secret env vars
+# marked sync:false in the dashboard.
+services:
+  - type: web
+    name: punch-in-system-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: singapore
+    plan: starter          # `free` also works but sleeps after inactivity
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: COOKIE_SECURE
+        value: "true"
+      # The PWA is on Firebase, a different origin, so the refresh cookie has
+      # to be SameSite=None and that origin has to be allowed through CORS.
+      - key: COOKIE_SAMESITE
+        value: none
+      - key: CORS_ORIGINS
+        value: https://punchin-7c498.web.app,https://punchin-7c498.firebaseapp.com
+      # Render terminates TLS in front of the container, so the real client IP
+      # arrives in X-Forwarded-For. Without this the rate limiter throttles
+      # every user as one.
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      # Render has no release phase, so the schema is applied as the container
+      # boots. Alembic locks alembic_version, so concurrent instances are safe.
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DB_MAX_OVERFLOW
+        value: "5"
+      # Set these in the dashboard; never commit them.
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false

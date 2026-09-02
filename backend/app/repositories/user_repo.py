@@ -21,6 +21,22 @@ def get_by_member_id(db: Session, member_id: str) -> User | None:
     return db.scalar(select(User).where(User.member_id == member_id))
 
 
+def get_by_identifier(db: Session, identifier: str) -> User | None:
+    """Resolve an enrollment number or an email address to a user.
+
+    Enrollment number is tried first: it is the members' credential, and an
+    email cannot collide with one because emails contain '@'.
+    """
+    value = identifier.strip()
+    if not value:
+        return None
+    return db.scalar(
+        select(User).where(
+            or_(func.lower(User.member_id) == value.lower(), User.email == value)
+        )
+    )
+
+
 def lock_for_update(db: Session, user_id: uuid.UUID) -> User | None:
     """Row-level lock. Serialises concurrent punches for the same user."""
     return db.scalar(select(User).where(User.id == user_id).with_for_update())

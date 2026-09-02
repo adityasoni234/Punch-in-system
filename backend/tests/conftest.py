@@ -11,6 +11,14 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "postgresql+psycopg://punchin:punchin@localhost:5432/punchin_test",
 )
 os.environ["DEBUG"] = "false"
+# Pin the cookie settings rather than inheriting whatever profile backend/.env
+# currently holds: the deployment profile sets Secure cookies, which the test
+# client (plain http://testserver) would silently discard, breaking the refresh
+# tests for reasons that have nothing to do with the code under test.
+os.environ["COOKIE_SECURE"] = "false"
+os.environ["COOKIE_SAMESITE"] = "lax"
+os.environ["CORS_ORIGINS"] = ""
+os.environ["RUN_MIGRATIONS_ON_START"] = "false"
 os.environ["RATE_LIMIT_LOGIN_MAX"] = "5"
 os.environ["RATE_LIMIT_LOGIN_WINDOW_SECONDS"] = "900"
 os.environ["RATE_LIMIT_PUNCH_MAX"] = "10"
@@ -136,7 +144,7 @@ def admin(db):
 
 def login(client: TestClient, email: str, password: str = "CorrectHorse99") -> str:
     response = client.post(
-        "/api/v1/auth/login", json={"email": email, "password": password}
+        "/api/v1/auth/login", json={"identifier": email, "password": password}
     )
     assert response.status_code == 200, response.text
     return response.json()["access_token"]

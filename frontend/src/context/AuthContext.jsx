@@ -37,8 +37,14 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const signIn = useCallback(async (email, password) => {
-    const next = await authService.login(email, password);
+  const signIn = useCallback(async (identifier, password) => {
+    const next = await authService.login(identifier, password);
+    setSession(next);
+    return next;
+  }, []);
+
+  const signUp = useCallback(async (details) => {
+    const next = await authService.register(details);
     setSession(next);
     return next;
   }, []);
@@ -68,10 +74,11 @@ export function AuthProvider({ children }) {
       mustChangePassword: Boolean(session?.user?.must_change_password),
       booting,
       signIn,
+      signUp,
       signOut,
       refreshUser,
     }),
-    [session, booting, signIn, signOut, refreshUser],
+    [session, booting, signIn, signUp, signOut, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

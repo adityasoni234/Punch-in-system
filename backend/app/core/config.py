@@ -60,11 +60,40 @@ class Settings(BaseSettings):
     rate_limit_global_max: int = 300
     rate_limit_global_window_seconds: int = 60
 
+    # -- Registration -----------------------------------------------------
+    # Self sign up is convenient but means anyone who reaches the app can
+    # create an account. Turn it off to make accounts admin-issued only.
+    allow_self_registration: bool = True
+
     # -- Privacy ----------------------------------------------------------
     location_retention_days: int = 180
 
     # -- Proxy ------------------------------------------------------------
     trust_proxy_headers: bool = False
+
+    # -- Startup ----------------------------------------------------------
+    # Platforms without a release phase (Render, Fly, plain containers) need
+    # the schema applied as the container boots. Off by default so a local run
+    # never migrates a database behind your back.
+    run_migrations_on_start: bool = False
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalise_database_url(cls, v: object) -> object:
+        """Accept the URL shape hosted providers actually hand out.
+
+        Neon, Supabase, Render and Heroku all issue `postgres://` or
+        `postgresql://` URLs. Neither selects the psycopg3 driver this app
+        uses, and the resulting failure ("Can't load plugin") says nothing
+        useful, so rewrite the scheme rather than making every deployment
+        remember to.
+        """
+        if not isinstance(v, str) or not v:
+            return v
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v[len(prefix) :]
+        return v
 
     @field_validator("cookie_domain", mode="before")
     @classmethod

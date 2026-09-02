@@ -8,7 +8,10 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import (
+    ConflictError,
+    ForbiddenError,
     InvalidCredentialsError,
     TokenExpiredError,
     TokenInvalidError,
@@ -26,7 +29,7 @@ from app.core.security import (
     verify_password,
 )
 from app.core.time import utcnow
-from app.models.enums import AuditAction, AuditResult, UserStatus
+from app.models.enums import AuditAction, AuditResult, Role, UserStatus
 from app.models.user import User
 from app.repositories import token_repo, user_repo
 from app.services import audit_service
@@ -72,15 +75,69 @@ def _issue(
     )
 
 
-def login(
+def register(
     db: Session,
     *,
+    name: str,
     email: str,
+    member_id: str,
     password: str,
     user_agent: str | None,
     ip_address: str | None,
 ) -> IssuedSession:
-    user = user_repo.get_by_email(db, email)
+    """Self-service sign up.
+
+    Creates an ordinary member account and signs them straight in. The role is
+    always USER: an account can never grant itself administrative rights, which
+    is why the role is not taken from the request.
+    """
+    if not settings.allow_self_registration:
+        raise ForbiddenError(
+            "Self sign up is disabled. Ask your administrator for an account."
+        )
+
+    email = email.strip().lower()
+    member_id = member_id.strip()
+
+    if user_repo.get_by_email(db, email) is not None:
+        raise ConflictError("An account with this email already exists.")
+    if user_repo.get_by_member_id(db, member_id) is not None:
+        raise ConflictError("An account with this enrollment number already exists.")
+
+    user = User(
+        name=name.strip(),
+        email=email,
+        member_id=member_id,
+        password_hash=hash_password(password),
+        role=Role.USER,
+        status=UserStatus.ACTIVE,
+        must_change_password=False,
+        password_changed_at=utcnow(),
+        last_login_at=utcnow(),
+    )
+    user_repo.add(db, user)
+
+    issued = _issue(db, user, user_agent=user_agent, ip_address=ip_address)
+    audit_service.success(
+        db,
+        AuditAction.USER_CREATED,
+        actor_user_id=user.id,
+        target_user_id=user.id,
+        metadata={"via": "self_registration", "member_id": member_id},
+    )
+    db.commit()
+    return issued
+
+
+def login(
+    db: Session,
+    *,
+    identifier: str,
+    password: str,
+    user_agent: str | None,
+    ip_address: str | None,
+) -> IssuedSession:
+    user = user_repo.get_by_identifier(db, identifier)
 
     # verify_password hashes a dummy value when the user is missing so that a
     # non-existent account is indistinguishable from a wrong password by timing.
@@ -90,7 +147,7 @@ def login(
             AuditAction.LOGIN_FAILED,
             AuditResult.FAILURE,
             actor_user_id=user.id if user else None,
-            metadata={"email": email, "reason": "INVALID_CREDENTIALS"},
+            metadata={"identifier": identifier, "reason": "INVALID_CREDENTIALS"},
         )
         db.commit()
         raise InvalidCredentialsError()

@@ -10,6 +10,7 @@ from app.repositories import workspace_repo
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
+    RegisterRequest,
     SessionInfo,
     UserPublic,
     WorkspacePublic,
@@ -67,12 +68,51 @@ def login(
 ) -> SessionInfo:
     # A second, per-account limit so one attacker cannot spread a password
     # spray for a single account across many source addresses.
-    rate_limit.enforce(db, rate_limit.login_policy(), f"email:{payload.email.lower()}")
+    rate_limit.enforce(
+        db, rate_limit.login_policy(), f"id:{payload.identifier.lower()}"
+    )
     db.commit()
 
     issued = auth_service.login(
         db,
-        email=str(payload.email).lower(),
+        identifier=payload.identifier,
+        password=payload.password,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=getattr(request.state, "client_ip", None),
+    )
+    _set_refresh_cookie(response, issued.refresh_token)
+    return SessionInfo(
+        access_token=issued.access_token,
+        expires_at=issued.access_expires_at,
+        user=UserPublic.model_validate(issued.user),
+        workspace=_workspace_public(db),
+        server_time=utcnow(),
+    )
+
+
+@router.post(
+    "/register",
+    response_model=SessionInfo,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(login_rate_limit)],
+    summary="Create a member account",
+)
+def register(
+    payload: RegisterRequest,
+    request: Request,
+    response: Response,
+    db: DbSession,
+) -> SessionInfo:
+    """Self-service sign up, then straight into the app.
+
+    The account is always created as a member; roles are only granted by an
+    administrator.
+    """
+    issued = auth_service.register(
+        db,
+        name=payload.name,
+        email=str(payload.email),
+        member_id=payload.member_id,
         password=payload.password,
         user_agent=request.headers.get("user-agent"),
         ip_address=getattr(request.state, "client_ip", None),
