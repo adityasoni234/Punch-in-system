@@ -47,6 +47,7 @@ export default function AdminUserDetail() {
   const [busy, setBusy] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState(null);
   const [showEvents, setShowEvents] = useState(false);
+  const [savingTeam, setSavingTeam] = useState(false);
 
   const user = useAsync(() => getUser(userId), [userId]);
   const attendance = useAsync(
@@ -70,6 +71,22 @@ export default function AdminUserDetail() {
       toast.error(error.message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  // One tap rather than Edit -> sheet -> save, because reassigning people
+  // across teams is a bulk chore at the start of a term.
+  const setTeam = async (team) => {
+    if (!person || team === person.team) return;
+    setSavingTeam(true);
+    try {
+      await updateUser(person.id, { team });
+      toast.success(`Moved to ${teamLabel(team)}.`);
+      user.reload({ quiet: true });
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setSavingTeam(false);
     }
   };
 
@@ -163,6 +180,21 @@ export default function AdminUserDetail() {
             {person.status === 'ACTIVE' ? 'Disable user' : 'Enable user'}
           </Button>
         </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Team</CardTitle>
+        <SegmentedControl
+          options={TEAMS.map((t) => ({ value: t.value, label: t.short }))}
+          value={person.team}
+          onChange={setTeam}
+          ariaLabel="Assign team"
+        />
+        <p className="tiny" style={{ marginTop: 'var(--sp-2)', marginBottom: 0 }}>
+          {savingTeam
+            ? 'Saving…'
+            : `Currently ${teamLabel(person.team)}. Changes save immediately.`}
+        </p>
       </Card>
 
       <SegmentedControl
