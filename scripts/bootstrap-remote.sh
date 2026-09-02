@@ -29,8 +29,14 @@ command -v gcloud >/dev/null 2>&1 || {
   exit 1
 }
 
-CONNECTION_NAME="${PROJECT}:${REGION}:${INSTANCE}"
 gcloud config set project "${PROJECT}" >/dev/null
+
+# Only mount the Cloud SQL socket when Cloud SQL is actually in use; with an
+# external free-tier database the job reaches it over TLS like any other host.
+SQL_FLAGS=()
+if [ -z "${DATABASE_URL:-}" ]; then
+  SQL_FLAGS=(--set-cloudsql-instances "${PROJECT}:${REGION}:${INSTANCE}")
+fi
 
 run_job() {
   local description="$1"
@@ -44,7 +50,7 @@ run_job() {
     gcloud run jobs create "${JOB}" \
       --region "${REGION}" \
       --source backend \
-      --set-cloudsql-instances "${CONNECTION_NAME}" \
+      "${SQL_FLAGS[@]}" \
       --set-secrets "SECRET_KEY=punchin-secret-key:latest,DATABASE_URL=punchin-database-url:latest" \
       --set-env-vars "ENVIRONMENT=production,DEBUG=false,COOKIE_SECURE=true" \
       --command python \

@@ -30,18 +30,29 @@ if ! command -v gcloud >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ -z "${DB_PASSWORD:-}" ]; then
-  echo "Set the database password that create-cloudsql.sh printed:" >&2
-  echo "  export DB_PASSWORD='...'" >&2
-  exit 1
+# Two ways to reach a database, and the choice is purely about cost:
+#
+#   DATABASE_URL set  -> an external managed Postgres (Neon, Supabase). Free
+#                        tiers exist, reached over TLS. Nothing to provision
+#                        here, and no Cloud SQL bill.
+#   DATABASE_URL unset-> Cloud SQL over the socket Cloud Run mounts. Tighter
+#                        integration, but the instance bills continuously.
+SQL_FLAGS=()
+if [ -n "${DATABASE_URL:-}" ]; then
+  echo "Using the external database from DATABASE_URL"
+else
+  if [ -z "${DB_PASSWORD:-}" ]; then
+    echo "Set one of these first:" >&2
+    echo "  export DATABASE_URL='postgresql://user:pass@host/db?sslmode=require'   # free tier" >&2
+    echo "  export DB_PASSWORD='...'   # the password ./scripts/create-cloudsql.sh printed" >&2
+    exit 1
+  fi
+  CONNECTION_NAME="${PROJECT}:${REGION}:${INSTANCE}"
+  # Cloud Run mounts the Cloud SQL socket at /cloudsql/<connection name>, so
+  # the host is a directory path rather than a hostname.
+  DATABASE_URL="postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@/${DB_NAME}?host=/cloudsql/${CONNECTION_NAME}"
+  SQL_FLAGS=(--add-cloudsql-instances "${CONNECTION_NAME}")
 fi
-
-CONNECTION_NAME="${PROJECT}:${REGION}:${INSTANCE}"
-
-# Cloud Run mounts the Cloud SQL socket at /cloudsql/<connection name>, so the
-# host is a directory path rather than a hostname. No IP allowlisting, no TLS
-# config, and the database is never exposed to the internet.
-DATABASE_URL="postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@/${DB_NAME}?host=/cloudsql/${CONNECTION_NAME}"
 
 # Reuse the existing signing key so live sessions survive the move.
 if [ -s backend/.secret_key ]; then
@@ -56,9 +67,8 @@ fi
 gcloud config set project "${PROJECT}" >/dev/null
 
 echo "Enabling the APIs this needs ..."
-gcloud services enable run.googleapis.com sqladmin.googleapis.com \
-  secretmanager.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
-  >/dev/null
+gcloud services enable run.googleapis.com secretmanager.googleapis.com \
+  cloudbuild.googleapis.com artifactregistry.googleapis.com >/dev/null
 
 echo "Storing secrets in Secret Manager ..."
 store_secret() {
@@ -80,7 +90,7 @@ gcloud run deploy "${SERVICE}" \
   --source backend \
   --region "${REGION}" \
   --allow-unauthenticated \
-  --add-cloudsql-instances "${CONNECTION_NAME}" \
+  "${SQL_FLAGS[@]}" \
   --set-secrets "SECRET_KEY=punchin-secret-key:latest,DATABASE_URL=punchin-database-url:latest" \
   --set-env-vars "ENVIRONMENT=production,DEBUG=false,COOKIE_SECURE=true,COOKIE_SAMESITE=lax,TRUST_PROXY_HEADERS=true,RUN_MIGRATIONS_ON_START=true,CORS_ORIGINS=,DB_POOL_SIZE=5,DB_MAX_OVERFLOW=5" \
   --min-instances 0 --max-instances 4 --cpu 1 --memory 512Mi --port 8080
