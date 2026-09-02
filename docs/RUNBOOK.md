@@ -60,6 +60,10 @@ tier needs no payment details at all.
 Blaze does require a card on the Google project even though the usage is
 free — Firebase cannot forward `/api/**` to a backend on the Spark plan.
 
+> **Already done for this project:** the Neon database exists and has the
+> schema, the workspace and the admin account. Skip to Step 2, and skip
+> Step 4 entirely.
+
 ### Step 1 — Get a free database (browser)
 
 1. Sign up at <https://neon.tech> (free, no card)
@@ -93,10 +97,11 @@ Neon gives you is rewritten to the driver this app uses, so paste it as-is.
 
 ### Step 4 — Create the workspace and your admin account
 
-Keep the same terminal (it still has `DATABASE_URL` exported):
+Only needed on a fresh database. Keep the same terminal (it still has
+`DATABASE_URL` exported):
 
 ```bash
-./scripts/bootstrap-remote.sh --admin "Aditya Soni" adityaksoni234@gmail.com ADM001
+./scripts/bootstrap-remote.sh --admin "Your Name" you@example.com ADM001
 ```
 
 It prints a temporary password. Copy it — shown once.
